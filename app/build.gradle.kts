@@ -22,4 +22,8 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+dependencies {
+    implementation("androidx.activity:activity-ktx:1.10.1")
+    implementation("androidx.core:core-ktx:1.16.0")
+}
 }
