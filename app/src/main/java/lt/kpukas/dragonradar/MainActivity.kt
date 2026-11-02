@@ -913,20 +913,19 @@ class MainActivity : ComponentActivity(), LocationListener {
         ) {
             if (foundBalls.isEmpty()) return
 
-            // Pirmi šeši rutuliai išsidėsto abipus rodyklės.
-            // Septintasis visada atsiduria tiksliai virš rodyklės smaigalio.
+            // Kiekvienas rastas rutulys rodomas savo vietoje aplink rodyklę.
+            // Rutulio viduje žvaigždutės išdėstomos taip pat kaip pagrindiniame ekrane.
             val positions = arrayOf(
                 Pair(-17f, -15f), Pair(-17f, 5f), Pair(-17f, 25f),
                 Pair(17f, -15f), Pair(17f, 5f), Pair(17f, 25f),
                 Pair(0f, 0f)
             )
-            val radius = 10f
+            val radius = 10.5f
+            val scale = radius / 86f
             val ballPaint = Paint(Paint.ANTI_ALIAS_FLAG)
             val starPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(135, 35, 0)
-                textAlign = Paint.Align.CENTER
-                textSize = 10f
-                typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+                style = Paint.Style.FILL
             }
             val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(255, 235, 135)
@@ -950,25 +949,46 @@ class MainActivity : ComponentActivity(), LocationListener {
                 ballPaint.shader = null
                 canvas.drawCircle(centerX, centerY, radius, rimPaint)
 
-                // Žvaigždučių skaičius rutulio viduje.
-                val stars = when (number) {
-                    1 -> "★"
-                    2 -> "★★"
-                    3 -> "★★★"
-                    4 -> "★★★★"
-                    5 -> "★★★★★"
-                    6 -> "★★★★★★"
-                    else -> "★★★★★★★"
+                val starPositions = when (number) {
+                    1 -> listOf(Pair(0f, 0f))
+                    2 -> listOf(Pair(-22f, 0f), Pair(22f, 0f))
+                    3 -> listOf(Pair(0f, -24f), Pair(-22f, 18f), Pair(22f, 18f))
+                    4 -> listOf(Pair(-22f, -22f), Pair(22f, -22f), Pair(-22f, 22f), Pair(22f, 22f))
+                    5 -> listOf(Pair(0f, -30f), Pair(-29f, -8f), Pair(29f, -8f), Pair(-18f, 27f), Pair(18f, 27f))
+                    6 -> listOf(Pair(-25f, -25f), Pair(25f, -25f), Pair(-25f, 0f), Pair(25f, 0f), Pair(-25f, 25f), Pair(25f, 25f))
+                    else -> listOf(Pair(0f, -34f), Pair(-29f, -17f), Pair(29f, -17f), Pair(-34f, 14f), Pair(0f, 5f), Pair(34f, 14f), Pair(0f, 36f))
                 }
-                starPaint.textSize = if (number >= 5) 4.5f else 5.5f
-                val label = if (number >= 5) number.toString() else stars
-                canvas.drawText(
-                    label,
-                    centerX,
-                    centerY - (starPaint.ascent() + starPaint.descent()) / 2f,
-                    starPaint
-                )
+
+                starPositions.forEach { offset ->
+                    drawMiniDragonStar(
+                        canvas,
+                        centerX + offset.first * scale,
+                        centerY + offset.second * scale,
+                        19f * scale,
+                        starPaint
+                    )
+                }
             }
+        }
+
+        private fun drawMiniDragonStar(
+            canvas: Canvas,
+            centerX: Float,
+            centerY: Float,
+            radius: Float,
+            paint: Paint
+        ) {
+            val path = Path()
+            val innerRadius = radius * 0.43f
+            for (i in 0 until 10) {
+                val angle = Math.toRadians(-90.0 + i * 36.0)
+                val r = if (i % 2 == 0) radius else innerRadius
+                val px = centerX + cos(angle).toFloat() * r
+                val py = centerY + sin(angle).toFloat() * r
+                if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
+            }
+            path.close()
+            canvas.drawPath(path, paint)
         }
 
         private fun drawFoundButton(canvas: Canvas) {
