@@ -777,8 +777,22 @@ class MainActivity : ComponentActivity(), LocationListener {
         val restartButton = Button(this).apply {
             text = "Noriu pradėti iš naujo"
             textSize = 18f
-            setTextColor(Color.WHITE)
-            setBackgroundTintList(ColorStateList.valueOf(Color.rgb(225, 112, 0)))
+            isAllCaps = false
+            typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+            setTextColor(Color.rgb(105, 43, 0))
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(
+                    Color.rgb(255, 220, 75),
+                    Color.rgb(255, 153, 0),
+                    Color.rgb(215, 85, 0)
+                )
+            ).apply {
+                cornerRadius = 18f * resources.displayMetrics.density
+                setStroke((3f * resources.displayMetrics.density).toInt(), Color.rgb(145, 55, 0))
+            }
+            elevation = 8f * resources.displayMetrics.density
+            stateListAnimator = null
             alpha = 0f
             visibility = View.GONE
         }
