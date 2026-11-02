@@ -1305,7 +1305,7 @@ class MainActivity : ComponentActivity(), LocationListener {
                 setShadowLayer(3f, 1f, 2f, Color.BLACK)
             }
             canvas.drawText(
-                "★  RADU! PAŽYMĖTI RASTU ★",
+                "RADAU",
                 rect.centerX(),
                 rect.centerY() - (label.ascent() + label.descent()) / 2f,
                 label
