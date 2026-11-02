@@ -782,14 +782,17 @@ class MainActivity : ComponentActivity(), LocationListener {
             alpha = 0f
             visibility = View.GONE
         }
+        val density = resources.displayMetrics.density
+        fun dp(value: Int) = (value * density).toInt()
         val buttonParams = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
-            76
+            dp(64)
         ).apply {
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-            leftMargin = 44
-            rightMargin = 44
-            bottomMargin = 70
+            leftMargin = dp(24)
+            rightMargin = dp(24)
+            // Pakeliame mygtuką aukščiau, kad jo neuždengtų apatinė ekrano juosta.
+            bottomMargin = dp(140)
         }
         root.addView(restartButton, buttonParams)
         videoDialog.setContentView(root)
