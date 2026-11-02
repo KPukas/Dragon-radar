@@ -660,16 +660,16 @@ class MainActivity : ComponentActivity(), LocationListener {
         private var phase = 0f
         private var scanAngle = -90f
         private var entryGlow = 0f
-        // Radaro mastelis keičia tik vaizduojamą atstumą, ne GPS koordinates.
-        private var radarRangeMeters = 5000f
-        private val zoomDetector = ScaleGestureDetector(context,
-            object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-                override fun onScale(detector: ScaleGestureDetector): Boolean {
-                    radarRangeMeters = (radarRangeMeters / detector.scaleFactor).coerceIn(250f, 50000f)
-                    invalidate()
-                    return true
-                }
-            })
+        // Keturi mastelio lygiai: kiekvienas paspaudimas priartina aplink žaidėją.
+        // GPS koordinatės nekinta – keičiasi tik radaro atvaizdavimo mastelis.
+        private val zoomRanges = floatArrayOf(5000f, 2500f, 1250f, 625f)
+        private var zoomLevel = 0
+        private val radarRangeMeters: Float
+            get() = zoomRanges[zoomLevel]
+        private val zoomButtonRect: RectF
+            get() = RectF(width * 0.08f, height - 91f, width * 0.54f, height - 28f)
+        private val backButtonRect: RectF
+            get() = RectF(width * 0.59f, height - 91f, width * 0.92f, height - 28f)
         // Originalus trumpas radaro pyptelėjimas, kartojamas aptikus išsaugotą rutulį.
         private val radarTone = ToneGenerator(AudioManager.STREAM_MUSIC, 65)
         private var lastSignalBeepAt = 0L
@@ -747,7 +747,7 @@ class MainActivity : ComponentActivity(), LocationListener {
             val sweep = Path().apply {
                 moveTo(cx, cy)
                 lineTo(cx, cy-r)
-                arcTo(RectF(cx-r, cy-r, cx+r, cy+r), -90f, phase * 360f)
+                arcTo(RectF(cx-r, cy-r, cx+r, cy+r), scanAngle - 55f, 55f)
                 close()
             }
             paint.style = Paint.Style.FILL
@@ -838,18 +838,61 @@ class MainActivity : ComponentActivity(), LocationListener {
             canvas.drawText(status, cx, height-104f, paint)
             paint.textSize = 18f
             paint.color = Color.rgb(185, 255, 190)
-            canvas.drawText("MASTELIS: ${formatRadarDistance(radarRangeMeters)}  •  SUGNYBK PIRŠTAIS", cx, height-78f, paint)
-            paint.color = Color.rgb(100, 255, 130)
-            canvas.drawRoundRect(RectF(cx-150f,height-68f,cx+150f,height-18f),18f,18f,paint)
-            paint.color = Color.rgb(5,45,15)
-            paint.textSize = 21f
-            canvas.drawText("GRĮŽTI", cx, height-35f, paint)
+            canvas.drawText("MASTELIS  ${zoomLevel + 1}/4  •  ${formatRadarDistance(radarRangeMeters)}", cx, height-112f, paint)
+            drawRadarControl(canvas, zoomButtonRect, "＋  PRIARTINTI  ${zoomLevel + 1}/4", true)
+            drawRadarControl(canvas, backButtonRect, "←  GRĮŽTI", false)
+        }
+
+        private fun drawRadarControl(canvas: Canvas, rect: RectF, label: String, zoom: Boolean) {
+            val radius = 22f
+            val colors = if (zoom) intArrayOf(
+                Color.rgb(175, 255, 95), Color.rgb(45, 175, 35), Color.rgb(15, 95, 25)
+            ) else intArrayOf(
+                Color.rgb(75, 125, 185), Color.rgb(20, 55, 105), Color.rgb(5, 20, 55)
+            )
+            val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.BLACK
+                setShadowLayer(12f, 0f, 5f, Color.BLACK)
+            }
+            canvas.drawRoundRect(rect, radius, radius, shadow)
+            val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(rect.left, rect.top, rect.left, rect.bottom,
+                    colors, null, Shader.TileMode.CLAMP)
+            }
+            canvas.drawRoundRect(rect, radius, radius, fill)
+            val border = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = 4f
+                color = if (zoom) Color.rgb(120, 255, 65) else Color.rgb(105, 160, 230)
+            }
+            canvas.drawRoundRect(rect, radius, radius, border)
+            val shine = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = 2f
+                color = Color.argb(100, 255, 255, 255)
+            }
+            canvas.drawRoundRect(RectF(rect.left + 5f, rect.top + 4f,
+                rect.right - 5f, rect.centerY()), radius - 5f, radius - 5f, shine)
+            val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.WHITE
+                textAlign = Paint.Align.CENTER
+                textSize = if (zoom) 17f else 19f
+                typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+                setShadowLayer(3f, 1f, 2f, Color.BLACK)
+            }
+            canvas.drawText(label, rect.centerX(),
+                rect.centerY() - (text.ascent() + text.descent()) / 2f, text)
         }
 
         override fun onTouchEvent(event: MotionEvent): Boolean {
-            zoomDetector.onTouchEvent(event)
-            if (event.action == MotionEvent.ACTION_UP && event.y > height - 115f) {
-                radarDialog?.dismiss()
+            if (event.action == MotionEvent.ACTION_UP) {
+                when {
+                    zoomButtonRect.contains(event.x, event.y) -> {
+                        zoomLevel = (zoomLevel + 1) % zoomRanges.size
+                        invalidate()
+                    }
+                    backButtonRect.contains(event.x, event.y) -> radarDialog?.dismiss()
+                }
             }
             return true
         }
