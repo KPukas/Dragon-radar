@@ -1032,6 +1032,7 @@ class MainActivity : ComponentActivity(), LocationListener {
         private var buttonGlow = 0f
         private var buttonGlowAnimator: ValueAnimator? = null
         private var scale = 1f
+        private var scaleY = 1f
         private var offsetX = 0f
         private var offsetY = 0f
 
@@ -1070,13 +1071,14 @@ class MainActivity : ComponentActivity(), LocationListener {
             // Naujas vertikalus maketas užpildo visą ekraną.
             // Koordinatės skaičiuojamos 1184 × 1792 projekto erdvėje.
             scale = width / 1184f
+            scaleY = height / 1792f
             offsetX = 0f
             offsetY = 0f
 
             val save = canvas.save()
 
             canvas.translate(offsetX, offsetY)
-            canvas.scale(scale, scale)
+            canvas.scale(scale, scaleY)
 
             if (bitmap != null) {
                 canvas.drawBitmap(
@@ -1476,7 +1478,7 @@ class MainActivity : ComponentActivity(), LocationListener {
         override fun onTouchEvent(event: MotionEvent): Boolean {
             if (scale <= 0f) return true
             val x = (event.x - offsetX) / scale
-            val y = (event.y - offsetY) / scale
+            val y = (event.y - offsetY) / scaleY
 
             if (event.action == MotionEvent.ACTION_DOWN) {
                 pressedButton = when {
