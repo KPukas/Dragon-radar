@@ -883,9 +883,9 @@ class MainActivity : ComponentActivity(), LocationListener {
             val status = when {
                 userLocation == null -> "GPS: WAITING FOR LOCATION"
                 savedBalls.isEmpty() -> "NO DRAGON BALLS SAVED"
-                foundBalls.size == savedBalls.size -> "ALL DRAGON BALLS FOUND!"
-                visibleCount == 0 -> "NO SIGNAL WITHIN ${formatRadarDistance(radarRangeMeters)}"
-                else -> "${visibleCount} SIGNAL(S)  •  NEAREST ${formatRadarDistance(nearestDistance)}"
+                foundBalls.size == 7 -> "ALL 7 DRAGON BALLS FOUND!"
+                visibleCount == 0 -> "FOUND ${foundBalls.size}/7  •  NO SIGNAL"
+                else -> "FOUND ${foundBalls.size}/7  •  ${visibleCount} SIGNAL(S)"
             }
             val closeToBall = nearestUnfoundBallNumber != 0 &&
                 nearestDistance <= foundDistanceMeters
@@ -898,9 +898,77 @@ class MainActivity : ComponentActivity(), LocationListener {
                 if (closeToBall) height-415f else height-300f,
                 paint
             )
+            // Surasti rutuliai kaupiasi prie rodyklės; septintasis uždedamas tiksliai ant jos viršaus.
+            drawCollectedDragonBalls(canvas, cx, arrowTop, foundBalls)
             if (closeToBall) drawFoundButton(canvas)
             drawRadarControl(canvas, zoomButtonRect, "＋  PRIARTINTI", true)
             drawRadarControl(canvas, backButtonRect, "←  GRĮŽTI", false)
+        }
+
+        private fun drawCollectedDragonBalls(
+            canvas: Canvas,
+            arrowCenterX: Float,
+            arrowTop: Float,
+            foundBalls: Set<Int>
+        ) {
+            if (foundBalls.isEmpty()) return
+
+            // Pirmi šeši rutuliai išsidėsto abipus rodyklės.
+            // Septintasis visada atsiduria tiksliai virš rodyklės smaigalio.
+            val positions = arrayOf(
+                Pair(-42f, -25f), Pair(-42f, 0f), Pair(-42f, 25f),
+                Pair(42f, -25f), Pair(42f, 0f), Pair(42f, 25f),
+                Pair(0f, -19f)
+            )
+            val radius = 13f
+            val ballPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+            val starPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.rgb(135, 35, 0)
+                textAlign = Paint.Align.CENTER
+                textSize = 10f
+                typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+            }
+            val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.rgb(255, 235, 135)
+                style = Paint.Style.STROKE
+                strokeWidth = 2f
+            }
+
+            for (number in 1..7) {
+                if (number !in foundBalls) continue
+                val centerX = arrowCenterX + positions[number - 1].first
+                val centerY = arrowTop + positions[number - 1].second
+                ballPaint.shader = RadialGradient(
+                    centerX - 4f, centerY - 5f, radius * 1.8f,
+                    intArrayOf(
+                        Color.rgb(255, 250, 155),
+                        Color.rgb(255, 165, 15),
+                        Color.rgb(220, 65, 0)
+                    ), null, Shader.TileMode.CLAMP
+                )
+                canvas.drawCircle(centerX, centerY, radius, ballPaint)
+                ballPaint.shader = null
+                canvas.drawCircle(centerX, centerY, radius, rimPaint)
+
+                // Žvaigždučių skaičius rutulio viduje.
+                val stars = when (number) {
+                    1 -> "★"
+                    2 -> "★★"
+                    3 -> "★★★"
+                    4 -> "★★★★"
+                    5 -> "★★★★★"
+                    6 -> "★★★★★★"
+                    else -> "★★★★★★★"
+                }
+                starPaint.textSize = if (number >= 5) 5.5f else 7f
+                val label = if (number >= 5) number.toString() else stars
+                canvas.drawText(
+                    label,
+                    centerX,
+                    centerY - (starPaint.ascent() + starPaint.descent()) / 2f,
+                    starPaint
+                )
+            }
         }
 
         private fun drawFoundButton(canvas: Canvas) {
