@@ -3,6 +3,7 @@ package lt.kpukas.dragonradar
 
 import android.Manifest
 import android.app.Dialog
+import android.app.AlertDialog
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
@@ -26,9 +27,12 @@ import android.animation.ValueAnimator
 import android.view.animation.DecelerateInterpolator
 import android.view.animation.LinearInterpolator
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import android.text.InputType
+import java.security.MessageDigest
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -110,16 +114,49 @@ class MainActivity : ComponentActivity(), LocationListener {
     }
 
     private fun requestGpsPermission() {
-        if (hasLocationPermission()) {
-            openGpsMap()
-        } else {
-            permissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                )
-            )
+        val savedPinHash = preferences.getString("gps_map_pin_hash", null)
+        if (savedPinHash.isNullOrBlank()) showCreatePinDialog() else showEnterPinDialog(savedPinHash)
+    }
+
+    private fun pinHash(pin: String): String {
+        val bytes = MessageDigest.getInstance("SHA-256").digest(pin.toByteArray())
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    private fun showCreatePinDialog() {
+        val firstInput = EditText(this).apply { hint = "Sugalvok 4 skaitmenų PIN"; inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD; filters = arrayOf(android.text.InputFilter.LengthFilter(4)) }
+        val firstDialog = AlertDialog.Builder(this).setTitle("Sukurk GPS žemėlapio PIN").setMessage("Pasirink savo 4 skaitmenų kodą. Jo reikės kiekvieną kartą atidarant GPS žemėlapį.").setView(firstInput).setNegativeButton("ATŠAUKTI", null).setPositiveButton("TĘSTI", null).create()
+        firstDialog.setOnShowListener {
+            firstDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val pin = firstInput.text.toString()
+                if (!pin.matches(Regex("\\d{4}"))) { firstInput.error = "Įvesk tiksliai 4 skaitmenis"; return@setOnClickListener }
+                firstDialog.dismiss()
+                val confirmInput = EditText(this).apply { hint = "Pakartok PIN kodą"; inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD; filters = arrayOf(android.text.InputFilter.LengthFilter(4)) }
+                val confirmDialog = AlertDialog.Builder(this).setTitle("Patvirtink PIN kodą").setView(confirmInput).setNegativeButton("ATŠAUKTI", null).setPositiveButton("IŠSAUGOTI", null).create()
+                confirmDialog.setOnShowListener {
+                    confirmDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        if (confirmInput.text.toString() != pin) confirmInput.error = "PIN kodai nesutampa" else { preferences.edit().putString("gps_map_pin_hash", pinHash(pin)).apply(); confirmDialog.dismiss(); continueToGpsMap() }
+                    }
+                }
+                confirmDialog.show()
+            }
         }
+        firstDialog.show()
+    }
+
+    private fun showEnterPinDialog(expectedHash: String) {
+        val input = EditText(this).apply { hint = "4 skaitmenų PIN"; inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD; filters = arrayOf(android.text.InputFilter.LengthFilter(4)) }
+        val dialog = AlertDialog.Builder(this).setTitle("GPS žemėlapis užrakintas").setMessage("Įvesk savo PIN kodą, kad atidarytum žemėlapį.").setView(input).setNegativeButton("ATŠAUKTI", null).setPositiveButton("ATIDARYTI", null).create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                if (input.text.length == 4 && pinHash(input.text.toString()) == expectedHash) { dialog.dismiss(); continueToGpsMap() } else input.error = "Neteisingas PIN kodas"
+            }
+        }
+        dialog.show()
+    }
+
+    private fun continueToGpsMap() {
+        if (hasLocationPermission()) openGpsMap() else permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
     }
 
     @Suppress("MissingPermission")
@@ -308,8 +345,9 @@ class MainActivity : ComponentActivity(), LocationListener {
         map.controller.setCenter(startPoint)
 
         // Rodome visus kitus jau pažymėtus rutulius žemėlapyje.
+        val foundNumbers = loadFoundBallNumbers()
         for ((number, point) in savedLocations) {
-            if (number == selectedBall) continue
+            if (number == selectedBall || number in foundNumbers) continue
 
             val savedMarker = Marker(map).apply {
                 position = point
@@ -328,7 +366,7 @@ class MainActivity : ComponentActivity(), LocationListener {
         }
 
         // Dabartinio pasirinkto rutulio žymeklis.
-        val marker = Marker(map).apply {
+        val marker = if (selectedBall !in foundNumbers) Marker(map).apply {
             position = startPoint
             icon = createBallMarkerIcon(selectedBall, 60)
 
@@ -357,7 +395,7 @@ class MainActivity : ComponentActivity(), LocationListener {
         }
 
         ballMarker = marker
-        map.overlays.add(marker)
+        if (marker != null) map.overlays.add(marker) else info.text = "Šis rutulys jau surinktas, todėl žemėlapyje jo nebėra."
 
         // Mėlynas GPS taškas su trumpu išsiplėtimo impulsu.
         var gpsPulse = 0f
@@ -473,6 +511,7 @@ class MainActivity : ComponentActivity(), LocationListener {
         }
 
         val confirmButton = Button(this).apply {
+            isEnabled = selectedBall !in foundNumbers
             text = "✓  PATVIRTINTI RUTULIO VIETĄ"
             textSize = 13f
             isAllCaps = false
