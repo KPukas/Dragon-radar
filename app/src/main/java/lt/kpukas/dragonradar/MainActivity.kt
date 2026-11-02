@@ -47,6 +47,7 @@ class MainActivity : ComponentActivity(), LocationListener {
     private var myLocationOverlay: Overlay? = null
     private var firstMapLocation = false
     private var selectedBallAlreadySaved = false
+    private var radarDialog: Dialog? = null
 
     private val preferences by lazy {
         getSharedPreferences("dragon_radar_creator", Context.MODE_PRIVATE)
@@ -581,7 +582,9 @@ class MainActivity : ComponentActivity(), LocationListener {
 
     private fun showRadarScreen() {
         val dialog = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        radarDialog = dialog
         dialog.setContentView(RadarView(this))
+        dialog.setOnDismissListener { radarDialog = null }
         dialog.show()
         dialog.window?.setLayout(
             android.view.WindowManager.LayoutParams.MATCH_PARENT,
@@ -671,16 +674,8 @@ class MainActivity : ComponentActivity(), LocationListener {
         }
 
         override fun onTouchEvent(event: MotionEvent): Boolean {
-            if (event.action == MotionEvent.ACTION_UP && event.y > height-115f) {
-                (context as? MainActivity)?.let { }
-                (parent as? View)?.performClick()
-                (this@MainActivity as MainActivity).let { activity ->
-                    // Uždaromas viršutinis radaro langas.
-                    (activity.window.decorView.rootView as? View)?.let { }
-                }
-                // Dialogą uždarome per paslėptą dialogo lango savininką.
-                (this.parent as? View)?.clearAnimation()
-                return true
+            if (event.action == MotionEvent.ACTION_UP && event.y > height - 115f) {
+                radarDialog?.dismiss()
             }
             return true
         }
@@ -801,6 +796,8 @@ class MainActivity : ComponentActivity(), LocationListener {
             )
         }
 
+        private var pressedButton = 0
+        private var buttonPressScale = 1f
         private var scale = 1f
         private var offsetX = 0f
         private var offsetY = 0f
@@ -892,6 +889,11 @@ class MainActivity : ComponentActivity(), LocationListener {
             radarIcon: Boolean
         ) {
             val radius = 30f
+            val buttonId = if (radarIcon) 1 else 2
+            val buttonCanvasSave = canvas.save()
+            if (pressedButton == buttonId) {
+                canvas.scale(buttonPressScale, buttonPressScale, rect.centerX(), rect.centerY())
+            }
             val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.argb(185, 0, 0, 0)
                 style = Paint.Style.FILL
@@ -1064,6 +1066,22 @@ class MainActivity : ComponentActivity(), LocationListener {
             val textY = rect.centerY() -
                 (textPaint.ascent() + textPaint.descent()) / 2f
             canvas.drawText(label, textX, textY, textPaint)
+            canvas.restoreToCount(buttonCanvasSave)
+        }
+
+        private fun animateButtonPress(buttonId: Int, pressed: Boolean) {
+            pressedButton = buttonId
+            val from = buttonPressScale
+            val to = if (pressed) 0.94f else 1f
+            ValueAnimator.ofFloat(from, to).apply {
+                duration = if (pressed) 75L else 125L
+                interpolator = DecelerateInterpolator()
+                addUpdateListener {
+                    buttonPressScale = it.animatedValue as Float
+                    invalidate()
+                }
+                start()
+            }
         }
 
         private fun drawDragonBall(canvas: Canvas, number: Int) {
@@ -1199,45 +1217,49 @@ class MainActivity : ComponentActivity(), LocationListener {
         }
 
         override fun onTouchEvent(event: MotionEvent): Boolean {
-            if (event.action != MotionEvent.ACTION_UP) {
-                return true
-            }
-
             if (scale <= 0f) return true
-
             val x = (event.x - offsetX) / scale
             val y = (event.y - offsetY) / scale
 
-            // Rutulių pasirinkimas.
-            for (number in 1..7) {
-                val center = ballCenters[number - 1]
-                val dx = x - center.first
-                val dy = y - center.second
+            if (event.action == MotionEvent.ACTION_DOWN) {
+                pressedButton = when {
+                    x in 176f..1008f && y in 755f..855f -> 1
+                    x in 176f..1008f && y in 1075f..1195f -> 2
+                    else -> 0
+                }
+                if (pressedButton != 0) animateButtonPress(pressedButton, true)
+                return true
+            }
 
-                if (dx * dx + dy * dy <= ballRadius * ballRadius) {
-                    selectBall(number)
+            if (event.action == MotionEvent.ACTION_UP) {
+                val pressed = pressedButton
+                if (pressed != 0) animateButtonPress(pressed, false)
+
+                for (number in 1..7) {
+                    val center = ballCenters[number - 1]
+                    val dx = x - center.first
+                    val dy = y - center.second
+                    if (dx * dx + dy * dy <= ballRadius * ballRadius) {
+                        selectBall(number)
+                        return true
+                    }
+                }
+
+                if (pressed == 1 && x in 176f..1008f && y in 755f..855f) {
+                    showRadarScreen()
                     return true
                 }
-            }
-
-            // Radaro mygtukas – buvusioje GPS valdiklio vietoje.
-            if (x in 176f..1008f && y in 755f..855f) {
-                showRadarScreen()
+                if (pressed == 2 && x in 176f..1008f && y in 1075f..1195f) {
+                    requestGpsPermission()
+                    return true
+                }
+                if (x < 175f && y < 175f) finish()
                 return true
             }
 
-            // GPS žymėjimo mygtukas apačioje.
-            if (x in 176f..1008f && y in 1075f..1195f) {
-                requestGpsPermission()
-                return true
+            if (event.action == MotionEvent.ACTION_CANCEL) {
+                if (pressedButton != 0) animateButtonPress(pressedButton, false)
             }
-
-            // Viršutiniame kairiajame kampe paliktas paveikslėlio išėjimo logotipas.
-            if (x < 175f && y < 175f) {
-                finish()
-                return true
-            }
-
             return true
         }
     }
