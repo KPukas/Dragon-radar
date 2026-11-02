@@ -14,6 +14,8 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.animation.ValueAnimator
+import android.view.animation.DecelerateInterpolator
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -37,7 +39,7 @@ class MainActivity : ComponentActivity(), LocationListener {
     private lateinit var locationManager: LocationManager
     private lateinit var creatorView: CreatorView
 
-    private var selectedBall = 1
+    private var selectedBall = 4
     private var currentLocation: Location? = null
     private var mapDialog: Dialog? = null
     private var mapView: MapView? = null
@@ -577,6 +579,118 @@ class MainActivity : ComponentActivity(), LocationListener {
         ).show()
     }
 
+    private fun showRadarScreen() {
+        val dialog = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        dialog.setContentView(RadarView(this))
+        dialog.show()
+        dialog.window?.setLayout(
+            android.view.WindowManager.LayoutParams.MATCH_PARENT,
+            android.view.WindowManager.LayoutParams.MATCH_PARENT
+        )
+    }
+
+    private inner class RadarView(context: Context) : View(context) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private var phase = 0f
+        private val animator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 1800L
+            repeatCount = ValueAnimator.INFINITE
+            addUpdateListener {
+                phase = it.animatedValue as Float
+                invalidate()
+            }
+        }
+
+        init { animator.start() }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            canvas.drawColor(Color.rgb(3, 20, 12))
+            val cx = width / 2f
+            val cy = height * 0.47f
+            val r = minOf(width * 0.43f, height * 0.37f)
+            paint.color = Color.rgb(10, 65, 28)
+            paint.style = Paint.Style.FILL
+            canvas.drawCircle(cx, cy, r + 20f, paint)
+            paint.shader = RadialGradient(cx - r * .2f, cy - r * .25f, r * 1.5f,
+                intArrayOf(Color.rgb(105, 205, 95), Color.rgb(15, 95, 42), Color.rgb(2, 35, 18)),
+                null, Shader.TileMode.CLAMP)
+            canvas.drawCircle(cx, cy, r, paint)
+            paint.shader = null
+            val clip = canvas.save()
+            val circle = Path().apply { addCircle(cx, cy, r, Path.Direction.CW) }
+            canvas.clipPath(circle)
+            paint.color = Color.argb(95, 190, 255, 170)
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = 1.5f
+            val step = r / 12f
+            var x = cx - r
+            while (x <= cx + r) { canvas.drawLine(x, cy-r, x, cy+r, paint); x += step }
+            var y = cy - r
+            while (y <= cy + r) { canvas.drawLine(cx-r, y, cx+r, y, paint); y += step }
+            paint.color = Color.argb(190, 190, 255, 170)
+            paint.strokeWidth = 3f
+            for (i in 1..4) canvas.drawCircle(cx, cy, r * i / 4f, paint)
+            canvas.drawLine(cx-r, cy, cx+r, cy, paint)
+            canvas.drawLine(cx, cy-r, cx, cy+r, paint)
+            val sweep = Path().apply {
+                moveTo(cx, cy)
+                lineTo(cx, cy-r)
+                arcTo(RectF(cx-r, cy-r, cx+r, cy+r), -90f, phase * 360f)
+                close()
+            }
+            paint.style = Paint.Style.FILL
+            paint.color = Color.argb(75, 190, 255, 130)
+            canvas.drawPath(sweep, paint)
+            // Taikinio krypties rodyklė ir mirksintis rutulio signalas.
+            paint.color = Color.RED
+            val arrow = Path().apply {
+                moveTo(cx, cy-r*.48f); lineTo(cx-r*.09f, cy+r*.08f)
+                lineTo(cx, cy-r*.02f); lineTo(cx+r*.09f, cy+r*.08f); close()
+            }
+            canvas.drawPath(arrow, paint)
+            paint.color = Color.YELLOW
+            paint.setShadowLayer(18f, 0f, 0f, Color.YELLOW)
+            val pulse = 8f + 5f * kotlin.math.abs(kotlin.math.sin(phase * Math.PI).toFloat())
+            canvas.drawCircle(cx+r*.55f, cy-r*.35f, pulse, paint)
+            paint.clearShadowLayer()
+            canvas.restoreToCount(clip)
+            paint.style = Paint.Style.FILL
+            paint.color = Color.WHITE
+            paint.textAlign = Paint.Align.CENTER
+            paint.typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+            paint.textSize = 30f
+            canvas.drawText("DRAGON RADAR", cx, 58f, paint)
+            paint.textSize = 22f
+            canvas.drawText("SIGNAL: SEARCHING", cx, height-90f, paint)
+            paint.color = Color.rgb(100, 255, 130)
+            canvas.drawRoundRect(RectF(cx-150f,height-68f,cx+150f,height-18f),18f,18f,paint)
+            paint.color = Color.rgb(5,45,15)
+            paint.textSize = 21f
+            canvas.drawText("GRĮŽTI", cx, height-35f, paint)
+        }
+
+        override fun onTouchEvent(event: MotionEvent): Boolean {
+            if (event.action == MotionEvent.ACTION_UP && event.y > height-115f) {
+                (context as? MainActivity)?.let { }
+                (parent as? View)?.performClick()
+                (this@MainActivity as MainActivity).let { activity ->
+                    // Uždaromas viršutinis radaro langas.
+                    (activity.window.decorView.rootView as? View)?.let { }
+                }
+                // Dialogą uždarome per paslėptą dialogo lango savininką.
+                (this.parent as? View)?.clearAnimation()
+                return true
+            }
+            return true
+        }
+
+        override fun onDetachedFromWindow() {
+            animator.cancel()
+            super.onDetachedFromWindow()
+        }
+    }
+
     private fun showSettings() {
         Toast.makeText(
             this,
@@ -631,13 +745,13 @@ class MainActivity : ComponentActivity(), LocationListener {
         }
 
         private val ballCenters = arrayOf(
-            Pair(252f, 335f),
-            Pair(480f, 335f),
-            Pair(704f, 335f),
-            Pair(930f, 335f),
-            Pair(362f, 507f),
-            Pair(590f, 507f),
-            Pair(820f, 507f)
+            Pair(300f, 390f),
+            Pair(884f, 390f),
+            Pair(300f, 700f),
+            Pair(592f, 535f),
+            Pair(884f, 700f),
+            Pair(410f, 870f),
+            Pair(774f, 870f)
         )
 
         private val ballRadius = 86f
@@ -1108,11 +1222,7 @@ class MainActivity : ComponentActivity(), LocationListener {
 
             // Radaro mygtukas – buvusioje GPS valdiklio vietoje.
             if (x in 176f..1008f && y in 755f..855f) {
-                Toast.makeText(
-                    context,
-                    "Radaro paieškos funkcija bus įjungta kitame etape.",
-                    Toast.LENGTH_SHORT
-                ).show()
+                showRadarScreen()
                 return true
             }
 
