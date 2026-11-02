@@ -834,60 +834,79 @@ class MainActivity : ComponentActivity(), LocationListener {
             val cy = rect.centerY()
 
             if (radarIcon) {
-                // Drakono rutulys su žvaigždėmis ir radaro sklidimo žiedais.
-                val ballX = cx - 8f
-                val ballY = cy + 4f
-                val ballRadius = 29f
+                // Klasikinis Dragon Radar: apvalus ekranas, skenavimo žiedai,
+                // krypties linijos ir vienas aptiktos rutulio vietos taškas.
+                val screenX = cx - 8f
+                val screenY = cy + 1f
+                val screenRadius = 42f
 
-                val ballFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    shader = RadialGradient(
-                        ballX - 9f, ballY - 11f, ballRadius * 1.8f,
-                        intArrayOf(
-                            Color.rgb(255, 248, 155),
-                            Color.rgb(255, 174, 20),
-                            Color.rgb(222, 75, 0)
-                        ),
-                        null,
-                        Shader.TileMode.CLAMP
-                    )
+                val bezel = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.rgb(10, 65, 12)
+                    style = Paint.Style.FILL
                 }
-                canvas.drawCircle(ballX, ballY, ballRadius, ballFill)
+                canvas.drawCircle(screenX, screenY, screenRadius + 9f, bezel)
 
-                val ballRim = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = Color.rgb(255, 235, 120)
+                val screen = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.rgb(178, 242, 105)
+                    style = Paint.Style.FILL
+                }
+                canvas.drawCircle(screenX, screenY, screenRadius, screen)
+
+                val grid = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.rgb(35, 115, 28)
                     style = Paint.Style.STROKE
                     strokeWidth = 3.5f
                 }
-                canvas.drawCircle(ballX, ballY, ballRadius, ballRim)
+                canvas.drawCircle(screenX, screenY, 14f, grid)
+                canvas.drawCircle(screenX, screenY, 28f, grid)
+                canvas.drawLine(
+                    screenX - screenRadius, screenY,
+                    screenX + screenRadius, screenY, grid
+                )
+                canvas.drawLine(
+                    screenX, screenY - screenRadius,
+                    screenX, screenY + screenRadius, grid
+                )
 
-                val star = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = Color.rgb(145, 25, 0)
+                val sweep = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.argb(105, 35, 145, 20)
                     style = Paint.Style.FILL
                 }
-                fun drawMiniStar(centerX: Float, centerY: Float, radius: Float) {
-                    val path = Path()
-                    for (i in 0 until 10) {
-                        val angle = Math.toRadians(-90.0 + i * 36.0)
-                        val r = if (i % 2 == 0) radius else radius * 0.43f
-                        val px = centerX + kotlin.math.cos(angle).toFloat() * r
-                        val py = centerY + kotlin.math.sin(angle).toFloat() * r
-                        if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
-                    }
-                    path.close()
-                    canvas.drawPath(path, star)
+                val sweepPath = Path().apply {
+                    moveTo(screenX, screenY)
+                    lineTo(screenX, screenY - screenRadius)
+                    arcTo(
+                        RectF(
+                            screenX - screenRadius,
+                            screenY - screenRadius,
+                            screenX + screenRadius,
+                            screenY + screenRadius
+                        ),
+                        -90f, 62f
+                    )
+                    close()
                 }
-                drawMiniStar(ballX - 10f, ballY - 7f, 9f)
-                drawMiniStar(ballX + 11f, ballY + 9f, 9f)
+                canvas.drawPath(sweepPath, sweep)
 
-                iconPaint.style = Paint.Style.STROKE
-                iconPaint.strokeWidth = 7f
+                val blip = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.rgb(255, 116, 0)
+                    style = Paint.Style.FILL
+                }
+                canvas.drawCircle(screenX + 18f, screenY - 17f, 7f, blip)
+
+                val highlight = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.argb(180, 225, 255, 190)
+                    style = Paint.Style.STROKE
+                    strokeWidth = 3f
+                }
                 canvas.drawArc(
-                    RectF(ballX - 2f, ballY - 50f, ballX + 90f, ballY + 50f),
-                    285f, 150f, false, iconPaint
-                )
-                canvas.drawArc(
-                    RectF(ballX + 12f, ballY - 67f, ballX + 122f, ballY + 67f),
-                    285f, 150f, false, iconPaint
+                    RectF(
+                        screenX - screenRadius + 5f,
+                        screenY - screenRadius + 5f,
+                        screenX + screenRadius - 5f,
+                        screenY + screenRadius - 5f
+                    ),
+                    205f, 105f, false, highlight
                 )
             } else {
                 // GPS vietos žymeklis.
