@@ -1,4 +1,3 @@
-
 package lt.kpukas.dragonradar
 
 import android.Manifest
@@ -687,4 +686,53 @@ class MainActivity : ComponentActivity(), LocationListener {
             canvas.drawPath(path, starPaint)
         }
 
-        override fun onTouc
+        
+        override fun onTouchEvent(event: MotionEvent): Boolean {
+            if (event.action != MotionEvent.ACTION_UP) {
+                return true
+            }
+
+            if (scale <= 0f) return true
+
+            val x = (event.x - offsetX) / scale
+            val y = (event.y - offsetY) / scale
+
+            // Rutulių pasirinkimas
+            for (number in 1..7) {
+                val center = ballCenters[number - 1]
+                val dx = x - center.first
+                val dy = y - center.second
+
+                if (dx * dx + dy * dy <= ballRadius * ballRadius) {
+                    selectBall(number)
+                    return true
+                }
+            }
+
+            // GPS arba žemėlapio pasirinkimas
+            if (y in 755f..855f) {
+                if (x < 590f) {
+                    requestGpsPermission()
+                } else {
+                    handleMapChoice()
+                }
+                return true
+            }
+
+            // Apatinis GPS mygtukas
+            if (y in 1100f..1250f) {
+                requestGpsPermission()
+                return true
+            }
+
+            // Nustatymai
+            if (x > 940f && y < 140f) {
+                showSettings()
+                return true
+            }
+
+            return true
+        }
+    }
+}
+
