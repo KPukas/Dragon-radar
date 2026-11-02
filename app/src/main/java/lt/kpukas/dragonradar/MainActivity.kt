@@ -971,13 +971,13 @@ class MainActivity : ComponentActivity(), LocationListener {
         }
 
         private val ballCenters = arrayOf(
-            Pair(300f, 390f),
-            Pair(884f, 390f),
-            Pair(300f, 700f),
-            Pair(592f, 535f),
-            Pair(884f, 700f),
-            Pair(410f, 870f),
-            Pair(774f, 870f)
+            Pair(259f, 390f),
+            Pair(764f, 390f),
+            Pair(259f, 700f),
+            Pair(512f, 535f),
+            Pair(764f, 700f),
+            Pair(355f, 870f),
+            Pair(670f, 870f)
         )
 
         private val ballRadius = 86f
@@ -1069,8 +1069,8 @@ class MainActivity : ComponentActivity(), LocationListener {
 
             // Pagrindinis paveikslėlis visada telpa visas, išlaikant proporcijas.
             // Naujas vertikalus maketas užpildo visą ekraną.
-            // Koordinatės skaičiuojamos 1184 × 1792 projekto erdvėje.
-            scale = width / 1184f
+            // Koordinatės skaičiuojamos 1024 × 1792 projekto erdvėje.
+            scale = width / 1024f
             scaleY = height / 1792f
             offsetX = 0f
             offsetY = 0f
@@ -1084,7 +1084,7 @@ class MainActivity : ComponentActivity(), LocationListener {
                 canvas.drawBitmap(
                     bitmap,
                     null,
-                    RectF(0f, 0f, 1184f, 1792f),
+                    RectF(0f, 0f, 1024f, 1792f),
                     Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
                 )
             }
@@ -1092,7 +1092,7 @@ class MainActivity : ComponentActivity(), LocationListener {
             // Radaro mygtukas perkeliamas į buvusią GPS mygtuko vietą.
             drawActionButton(
                 canvas,
-                RectF(145f, 1370f, 1039f, 1500f),
+                RectF(55f, 1460f, 490f, 1635f),
                 "RADARAS",
                 Color.rgb(85, 205, 35),
                 true
@@ -1101,7 +1101,7 @@ class MainActivity : ComponentActivity(), LocationListener {
             // GPS žymėjimas lieka apačioje, oranžinio paveikslėlio mygtuko vietoje.
             drawActionButton(
                 canvas,
-                RectF(145f, 1570f, 1039f, 1705f),
+                RectF(534f, 1460f, 969f, 1635f),
                 "ŽYMĖTI PAGAL GPS",
                 Color.rgb(255, 153, 0),
                 false
@@ -1192,7 +1192,7 @@ class MainActivity : ComponentActivity(), LocationListener {
                 strokeCap = Paint.Cap.ROUND
                 strokeJoin = Paint.Join.ROUND
             }
-            val cx = rect.left + 105f
+            val cx = rect.left + 62f
             val cy = rect.centerY()
 
             if (radarIcon) {
@@ -1304,11 +1304,11 @@ class MainActivity : ComponentActivity(), LocationListener {
             val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = if (radarIcon) Color.rgb(10, 65, 10) else Color.rgb(100, 38, 0)
                 textAlign = Paint.Align.CENTER
-                textSize = if (label.length > 15) 43f else 49f
+                textSize = if (label.length > 15) 25f else 34f
                 typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
                 setShadowLayer(1.5f, 1f, 2f, Color.argb(80, 0, 0, 0))
             }
-            val textX = rect.centerX() + 85f
+            val textX = rect.centerX() + 30f
             val textY = rect.centerY() -
                 (textPaint.ascent() + textPaint.descent()) / 2f
             canvas.drawText(label, textX, textY, textPaint)
@@ -1482,8 +1482,8 @@ class MainActivity : ComponentActivity(), LocationListener {
 
             if (event.action == MotionEvent.ACTION_DOWN) {
                 pressedButton = when {
-                    x in 145f..1039f && y in 1360f..1510f -> 1
-                    x in 145f..1039f && y in 1560f..1715f -> 2
+                    x in 55f..490f && y in 1460f..1635f -> 1
+                    x in 534f..969f && y in 1460f..1635f -> 2
                     else -> 0
                 }
                 if (pressedButton != 0) animateButtonPress(pressedButton, true)
@@ -1504,11 +1504,11 @@ class MainActivity : ComponentActivity(), LocationListener {
                     }
                 }
 
-                if (pressed == 1 && x in 176f..1008f && y in 755f..855f) {
+                if (pressed == 1 && x in 55f..490f && y in 1460f..1635f) {
                     showRadarScreen()
                     return true
                 }
-                if (pressed == 2 && x in 176f..1008f && y in 1075f..1195f) {
+                if (pressed == 2 && x in 534f..969f && y in 1460f..1635f) {
                     requestGpsPermission()
                     return true
                 }
