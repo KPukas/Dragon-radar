@@ -615,10 +615,28 @@ class MainActivity : ComponentActivity(), LocationListener {
         dialog.setContentView(view)
         if (hasLocationPermission()) {
             try {
+                // Pirmiausia panaudojame paskutinę žinomą GPS vietą,
+                // kad radaras neliktų tuščias, kol ateis naujas GPS matavimas.
                 for (provider in locationManager.getProviders(true)) {
-                    locationManager.requestLocationUpdates(provider, 1000L, 1f, this)
+                    try {
+                        val last = locationManager.getLastKnownLocation(provider)
+                        if (last != null &&
+                            (currentLocation == null || last.time > currentLocation!!.time)
+                        ) {
+                            currentLocation = last
+                        }
+                    } catch (_: SecurityException) {
+                    }
                 }
-            } catch (_: Exception) {}
+
+                for (provider in locationManager.getProviders(true)) {
+                    try {
+                        locationManager.requestLocationUpdates(provider, 1000L, 1f, this)
+                    } catch (_: SecurityException) {
+                    }
+                }
+            } catch (_: Exception) {
+            }
         }
         dialog.setOnDismissListener {
             radarDialog = null
