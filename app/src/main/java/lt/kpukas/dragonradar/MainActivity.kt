@@ -10,6 +10,9 @@ import android.graphics.*
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.media.AudioManager
+import android.media.ToneGenerator
+import android.os.SystemClock
 import android.os.Bundle
 import android.view.Gravity
 import android.view.MotionEvent
@@ -655,6 +658,9 @@ class MainActivity : ComponentActivity(), LocationListener {
         private var phase = 0f
         private var scanAngle = -90f
         private var entryGlow = 0f
+        // Originalus trumpas radaro pyptelėjimas, kartojamas aptikus išsaugotą rutulį.
+        private val radarTone = ToneGenerator(AudioManager.STREAM_MUSIC, 65)
+        private var lastSignalBeepAt = 0L
         private val entryAnimator = ValueAnimator.ofFloat(0f, 1f, 0f).apply {
             duration = 620L
             addUpdateListener {
@@ -794,6 +800,15 @@ class MainActivity : ComponentActivity(), LocationListener {
                 }
             }
             canvas.restoreToCount(clip)
+
+            // Pyptelėjimas tik tada, kai bent vienas išsaugotas rutulys patenka į radaro zoną.
+            // Ribojame dažnį, kad garsas būtų aiškus ir neerzintų.
+            val now = SystemClock.elapsedRealtime()
+            if (visibleCount > 0 && now - lastSignalBeepAt >= 2200L) {
+                radarTone.startTone(ToneGenerator.TONE_PROP_BEEP, 105)
+                lastSignalBeepAt = now
+            }
+
             paint.style = Paint.Style.FILL
             paint.color = Color.WHITE
             paint.textAlign = Paint.Align.CENTER
@@ -826,6 +841,8 @@ class MainActivity : ComponentActivity(), LocationListener {
             animator.cancel()
             entryAnimator.cancel()
             scanAnimator.cancel()
+            radarTone.stopTone()
+            radarTone.release()
             super.onDetachedFromWindow()
         }
     }
