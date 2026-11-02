@@ -18,6 +18,10 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.animation.ValueAnimator
 import android.view.animation.DecelerateInterpolator
 import android.view.animation.LinearInterpolator
@@ -655,7 +659,12 @@ class MainActivity : ComponentActivity(), LocationListener {
         )
     }
 
-    private inner class RadarView(context: Context) : View(context) {
+    private inner class RadarView(context: Context) : View(context), SensorEventListener {
+        private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        private val rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+        private var deviceAzimuth = 0f
+        private val rotationMatrix = FloatArray(9)
+        private val orientationAngles = FloatArray(3)
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         private var phase = 0f
         private var scanAngle = -90f
@@ -667,9 +676,9 @@ class MainActivity : ComponentActivity(), LocationListener {
         private val radarRangeMeters: Float
             get() = zoomRanges[zoomLevel]
         private val zoomButtonRect: RectF
-            get() = RectF(width * 0.08f, height - 91f, width * 0.54f, height - 28f)
+            get() = RectF(width * 0.06f, height - 158f, width * 0.53f, height - 82f)
         private val backButtonRect: RectF
-            get() = RectF(width * 0.59f, height - 91f, width * 0.92f, height - 28f)
+            get() = RectF(width * 0.57f, height - 158f, width * 0.94f, height - 82f)
         // Originalus trumpas radaro pyptelėjimas, kartojamas aptikus išsaugotą rutulį.
         private val radarTone = ToneGenerator(AudioManager.STREAM_MUSIC, 65)
         private var lastSignalBeepAt = 0L
@@ -699,6 +708,7 @@ class MainActivity : ComponentActivity(), LocationListener {
         }
 
         init {
+            rotationSensor?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
             animator.start()
             entryAnimator.start()
             scanAnimator.start()
@@ -778,10 +788,10 @@ class MainActivity : ComponentActivity(), LocationListener {
             paint.color = Color.RED
             val arrowSize = 5f
             val arrow = Path().apply {
-                moveTo(cx, cy-r*.20f)
-                lineTo(cx-arrowSize, cy+arrowSize)
-                lineTo(cx, cy+arrowSize*.45f)
-                lineTo(cx+arrowSize, cy+arrowSize)
+                moveTo(cx, cy-r*.04f)
+                lineTo(cx-arrowSize, cy+r*.16f)
+                lineTo(cx, cy+r*.10f)
+                lineTo(cx+arrowSize, cy+r*.16f)
                 close()
             }
             paint.setShadowLayer(7f, 0f, 0f, Color.RED)
@@ -801,7 +811,7 @@ class MainActivity : ComponentActivity(), LocationListener {
                     val distance = userLocation.distanceTo(target)
                     if (distance < nearestDistance) nearestDistance = distance
                     if (distance <= radarRangeMeters) {
-                        val bearing = Math.toRadians(userLocation.bearingTo(target).toDouble())
+                        val bearing = Math.toRadians(userLocation.bearingTo(target).toDouble() - Math.toDegrees(deviceAzimuth.toDouble()))
                         val normalizedDistance = (distance / radarRangeMeters).coerceIn(0f, 1f)
                         val dotRadius = r * normalizedDistance
                         val dotX = cx + kotlin.math.sin(bearing).toFloat() * dotRadius
@@ -842,10 +852,10 @@ class MainActivity : ComponentActivity(), LocationListener {
                 visibleCount == 0 -> "NO SIGNAL WITHIN ${formatRadarDistance(radarRangeMeters)}"
                 else -> "${visibleCount} SIGNAL(S)  •  NEAREST ${formatRadarDistance(nearestDistance)}"
             }
-            canvas.drawText(status, cx, height-104f, paint)
+            canvas.drawText(status, cx, height-202f, paint)
             paint.textSize = 18f
             paint.color = Color.rgb(185, 255, 190)
-            canvas.drawText("RADIJUS  ${formatRadarDistance(radarRangeMeters)}  •  ${zoomLevel + 1}/4", cx, height-112f, paint)
+            canvas.drawText("RADIJUS  ${formatRadarDistance(radarRangeMeters)}  •  ${zoomLevel + 1}/4", cx, height-174f, paint)
             drawRadarControl(canvas, zoomButtonRect, "＋  PRIARTINTI", true)
             drawRadarControl(canvas, backButtonRect, "←  GRĮŽTI", false)
         }
@@ -891,6 +901,17 @@ class MainActivity : ComponentActivity(), LocationListener {
                 rect.centerY() - (text.ascent() + text.descent()) / 2f, text)
         }
 
+        override fun onSensorChanged(event: SensorEvent) {
+            if (event.sensor.type == Sensor.TYPE_ROTATION_VECTOR) {
+                SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
+                SensorManager.getOrientation(rotationMatrix, orientationAngles)
+                deviceAzimuth = orientationAngles[0]
+                invalidate()
+            }
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+
         override fun onTouchEvent(event: MotionEvent): Boolean {
             if (event.action == MotionEvent.ACTION_UP) {
                 when {
@@ -905,6 +926,7 @@ class MainActivity : ComponentActivity(), LocationListener {
         }
 
         override fun onDetachedFromWindow() {
+            sensorManager.unregisterListener(this)
             animator.cancel()
             entryAnimator.cancel()
             scanAnimator.cancel()
