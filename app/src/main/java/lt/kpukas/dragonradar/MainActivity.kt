@@ -595,6 +595,23 @@ class MainActivity : ComponentActivity(), LocationListener {
     private inner class RadarView(context: Context) : View(context) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         private var phase = 0f
+        private var scanAngle = -90f
+        private var entryGlow = 0f
+        private val entryAnimator = ValueAnimator.ofFloat(0f, 1f, 0f).apply {
+            duration = 620L
+            addUpdateListener {
+                entryGlow = it.animatedValue as Float
+                invalidate()
+            }
+        }
+        private val scanAnimator = ValueAnimator.ofFloat(-90f, 270f).apply {
+            duration = 680L
+            interpolator = DecelerateInterpolator()
+            addUpdateListener {
+                scanAngle = it.animatedValue as Float
+                invalidate()
+            }
+        }
         private val animator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = 1800L
             repeatCount = ValueAnimator.INFINITE
@@ -604,7 +621,11 @@ class MainActivity : ComponentActivity(), LocationListener {
             }
         }
 
-        init { animator.start() }
+        init {
+            animator.start()
+            entryAnimator.start()
+            scanAnimator.start()
+        }
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
@@ -636,6 +657,16 @@ class MainActivity : ComponentActivity(), LocationListener {
             for (i in 1..4) canvas.drawCircle(cx, cy, r * i / 4f, paint)
             canvas.drawLine(cx-r, cy, cx+r, cy, paint)
             canvas.drawLine(cx, cy-r, cx, cy+r, paint)
+            // Trumpas, ryškus žalios spalvos sužibėjimas atidarant radarą.
+            if (entryGlow > 0f) {
+                paint.style = Paint.Style.STROKE
+                paint.strokeWidth = 10f + 12f * entryGlow
+                paint.color = Color.argb((150f * entryGlow).toInt(), 150, 255, 115)
+                paint.setShadowLayer(24f * entryGlow, 0f, 0f, Color.GREEN)
+                canvas.drawCircle(cx, cy, r + 8f, paint)
+                paint.clearShadowLayer()
+                paint.style = Paint.Style.FILL
+            }
             val sweep = Path().apply {
                 moveTo(cx, cy)
                 lineTo(cx, cy-r)
@@ -645,6 +676,20 @@ class MainActivity : ComponentActivity(), LocationListener {
             paint.style = Paint.Style.FILL
             paint.color = Color.argb(75, 190, 255, 130)
             canvas.drawPath(sweep, paint)
+            // Greitai apsisukanti skenavimo linija.
+            val scanRadians = Math.toRadians(scanAngle.toDouble())
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = 5f
+            paint.color = Color.argb(235, 205, 255, 165)
+            paint.setShadowLayer(16f, 0f, 0f, Color.GREEN)
+            canvas.drawLine(
+                cx, cy,
+                cx + kotlin.math.cos(scanRadians).toFloat() * r,
+                cy + kotlin.math.sin(scanRadians).toFloat() * r,
+                paint
+            )
+            paint.clearShadowLayer()
+            paint.style = Paint.Style.FILL
             // Taikinio krypties rodyklė ir mirksintis rutulio signalas.
             paint.color = Color.RED
             val arrow = Path().apply {
@@ -682,6 +727,8 @@ class MainActivity : ComponentActivity(), LocationListener {
 
         override fun onDetachedFromWindow() {
             animator.cancel()
+            entryAnimator.cancel()
+            scanAnimator.cancel()
             super.onDetachedFromWindow()
         }
     }
@@ -798,6 +845,8 @@ class MainActivity : ComponentActivity(), LocationListener {
 
         private var pressedButton = 0
         private var buttonPressScale = 1f
+        private var buttonGlow = 0f
+        private var buttonGlowAnimator: ValueAnimator? = null
         private var scale = 1f
         private var offsetX = 0f
         private var offsetY = 0f
@@ -891,6 +940,19 @@ class MainActivity : ComponentActivity(), LocationListener {
             val radius = 30f
             val buttonId = if (radarIcon) 1 else 2
             val buttonCanvasSave = canvas.save()
+            if (pressedButton == buttonId && buttonGlow > 0f) {
+                val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = if (radarIcon) Color.argb((145f * buttonGlow).toInt(), 75, 255, 45)
+                    else Color.argb((155f * buttonGlow).toInt(), 255, 145, 20)
+                    style = Paint.Style.STROKE
+                    strokeWidth = 12f + 10f * buttonGlow
+                    setShadowLayer(26f * buttonGlow, 0f, 0f, color)
+                }
+                canvas.drawRoundRect(
+                    RectF(rect.left - 5f, rect.top - 5f, rect.right + 5f, rect.bottom + 5f),
+                    radius + 8f, radius + 8f, glow
+                )
+            }
             if (pressedButton == buttonId) {
                 canvas.scale(buttonPressScale, buttonPressScale, rect.centerX(), rect.centerY())
             }
@@ -1074,10 +1136,23 @@ class MainActivity : ComponentActivity(), LocationListener {
             val from = buttonPressScale
             val to = if (pressed) 0.94f else 1f
             ValueAnimator.ofFloat(from, to).apply {
-                duration = if (pressed) 75L else 125L
+                duration = if (pressed) 75L else 155L
                 interpolator = DecelerateInterpolator()
                 addUpdateListener {
                     buttonPressScale = it.animatedValue as Float
+                    invalidate()
+                }
+                start()
+            }
+            buttonGlowAnimator?.cancel()
+            buttonGlowAnimator = ValueAnimator.ofFloat(
+                if (pressed) 0f else buttonGlow,
+                if (pressed) 1f else 0f
+            ).apply {
+                duration = if (pressed) 190L else 260L
+                interpolator = DecelerateInterpolator()
+                addUpdateListener {
+                    buttonGlow = it.animatedValue as Float
                     invalidate()
                 }
                 start()
