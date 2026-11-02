@@ -913,15 +913,22 @@ class MainActivity : ComponentActivity(), LocationListener {
         ) {
             if (foundBalls.isEmpty()) return
 
-            // Kiekvienas rastas rutulys rodomas savo vietoje aplink rodyklę.
-            // Rutulio viduje žvaigždutės išdėstomos taip pat kaip pagrindiniame ekrane.
-            val positions = arrayOf(
-                Pair(-17f, -15f), Pair(-17f, 5f), Pair(-17f, 25f),
-                Pair(17f, -15f), Pair(17f, 5f), Pair(17f, 25f),
-                Pair(0f, 0f)
-            )
+            // Visi surinkti rutuliai kartu sudaro tokį pat žvaigždučių raštą,
+            // koks būtų pavaizduotas viename atitinkamo skaičiaus Drakono rutulyje.
+            val count = foundBalls.size.coerceIn(1, 7)
+            val pattern = when (count) {
+                1 -> listOf(Pair(0f, 0f))
+                2 -> listOf(Pair(-22f, 0f), Pair(22f, 0f))
+                3 -> listOf(Pair(0f, -24f), Pair(-22f, 18f), Pair(22f, 18f))
+                4 -> listOf(Pair(-22f, -22f), Pair(22f, -22f), Pair(-22f, 22f), Pair(22f, 22f))
+                5 -> listOf(Pair(0f, -30f), Pair(-29f, -8f), Pair(29f, -8f), Pair(-18f, 27f), Pair(18f, 27f))
+                6 -> listOf(Pair(-25f, -25f), Pair(25f, -25f), Pair(-25f, 0f), Pair(25f, 0f), Pair(-25f, 25f), Pair(25f, 25f))
+                else -> listOf(Pair(0f, -34f), Pair(-29f, -17f), Pair(29f, -17f), Pair(-34f, 14f), Pair(0f, 5f), Pair(34f, 14f), Pair(0f, 36f))
+            }
+
             val radius = 10.5f
-            val scale = radius / 86f
+            // Šiek tiek sumažiname visą raštą, kad rutuliai gražiai tilptų virš rodyklės.
+            val layoutScale = 0.72f
             val ballPaint = Paint(Paint.ANTI_ALIAS_FLAG)
             val starPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(135, 35, 0)
@@ -933,10 +940,10 @@ class MainActivity : ComponentActivity(), LocationListener {
                 strokeWidth = 1.5f
             }
 
-            for (number in 1..7) {
-                if (number !in foundBalls) continue
-                val centerX = arrowCenterX + positions[number - 1].first
-                val centerY = arrowTop + positions[number - 1].second
+            foundBalls.sorted().take(count).forEachIndexed { index, ballNumber ->
+                val centerX = arrowCenterX + pattern[index].first * layoutScale
+                val centerY = arrowTop + pattern[index].second * layoutScale
+
                 ballPaint.shader = RadialGradient(
                     centerX - 4f, centerY - 5f, radius * 1.8f,
                     intArrayOf(
@@ -949,7 +956,9 @@ class MainActivity : ComponentActivity(), LocationListener {
                 ballPaint.shader = null
                 canvas.drawCircle(centerX, centerY, radius, rimPaint)
 
-                val starPositions = when (number) {
+                // Kiekvienas rutulys išlaiko savo numerį ir žvaigždučių skaičių.
+                val tinyScale = radius / 86f
+                val starOffsets = when (ballNumber) {
                     1 -> listOf(Pair(0f, 0f))
                     2 -> listOf(Pair(-22f, 0f), Pair(22f, 0f))
                     3 -> listOf(Pair(0f, -24f), Pair(-22f, 18f), Pair(22f, 18f))
@@ -958,13 +967,12 @@ class MainActivity : ComponentActivity(), LocationListener {
                     6 -> listOf(Pair(-25f, -25f), Pair(25f, -25f), Pair(-25f, 0f), Pair(25f, 0f), Pair(-25f, 25f), Pair(25f, 25f))
                     else -> listOf(Pair(0f, -34f), Pair(-29f, -17f), Pair(29f, -17f), Pair(-34f, 14f), Pair(0f, 5f), Pair(34f, 14f), Pair(0f, 36f))
                 }
-
-                starPositions.forEach { offset ->
+                starOffsets.forEach { offset ->
                     drawMiniDragonStar(
                         canvas,
-                        centerX + offset.first * scale,
-                        centerY + offset.second * scale,
-                        19f * scale,
+                        centerX + offset.first * tinyScale,
+                        centerY + offset.second * tinyScale,
+                        19f * tinyScale,
                         starPaint
                     )
                 }
