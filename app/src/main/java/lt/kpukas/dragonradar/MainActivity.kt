@@ -711,6 +711,7 @@ class MainActivity : ComponentActivity(), LocationListener {
             radarDialog = null
             radarView = null
             stopLocationUpdates()
+            if (loadFoundBallNumbers().size == 7) creatorView.startWishCelebration()
         }
         dialog.show()
         dialog.window?.setLayout(
@@ -1282,6 +1283,154 @@ class MainActivity : ComponentActivity(), LocationListener {
         private var scaleY = 1f
         private var offsetX = 0f
         private var offsetY = 0f
+        private var wishScene = 0 // 0 – įprastas ekranas, 1 – noras, 2 – išnykimas
+        private var wishProgress = 0f
+        private var wishAnimator: ValueAnimator? = null
+        private var wishButtonAlpha = 0f
+
+        fun startWishCelebration() {
+            if (wishScene != 0) return
+            wishScene = 1
+            wishProgress = 0f
+            wishButtonAlpha = 0f
+            wishAnimator?.cancel()
+            wishAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+                duration = 5200L
+                interpolator = LinearInterpolator()
+                addUpdateListener {
+                    wishProgress = it.animatedValue as Float
+                    wishButtonAlpha = ((wishProgress - 0.38f) / 0.28f).coerceIn(0f, 1f)
+                    invalidate()
+                }
+                start()
+            }
+            invalidate()
+        }
+
+        private fun beginWishExit() {
+            if (wishScene != 1 || wishButtonAlpha < 0.98f) return
+            wishScene = 2
+            wishProgress = 0f
+            wishAnimator?.cancel()
+            wishAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+                duration = 3600L
+                interpolator = LinearInterpolator()
+                addUpdateListener {
+                    wishProgress = it.animatedValue as Float
+                    invalidate()
+                    if (wishProgress >= 1f) {
+                        preferences.edit().putString("found_balls", "[]").apply()
+                        wishScene = 0
+                        wishProgress = 0f
+                        wishButtonAlpha = 0f
+                        invalidate()
+                    }
+                }
+                start()
+            }
+        }
+
+        private fun drawWishScene(canvas: Canvas) {
+            val save = canvas.save()
+            canvas.scale(width / 1024f, height / 1792f)
+            val dark = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(235, 3, 9, 28)
+            }
+            canvas.drawRect(0f, 0f, 1024f, 1792f, dark)
+
+            val exiting = wishScene == 2
+            val p = wishProgress
+            val glowAlpha = if (exiting) (255f * (1f - p)).toInt() else 210
+            val centerX = 512f
+            val centerY = 760f
+
+            // Septyni rutuliai suskrenda į centrą, pulsuoja ir švyti.
+            for (n in 1..7) {
+                val start = ballCenters[n - 1]
+                val spread = if (exiting) 1f + p * 2.8f else 1f - (p * 0.78f)
+                val angle = (n - 1) * (Math.PI * 2.0 / 7.0) - Math.PI / 2.0
+                val x = if (exiting) centerX + cos(angle).toFloat() * 300f * p else centerX + (start.first - centerX) * spread
+                val y = if (exiting) centerY + sin(angle).toFloat() * 420f * p else centerY + (start.second - centerY) * spread
+                val r = if (exiting) 44f * (1f - p) else 45f + 5f * sin(p * 18f).toFloat()
+                val ball = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    shader = RadialGradient(x - 12f, y - 15f, r * 1.8f,
+                        intArrayOf(Color.WHITE, Color.rgb(255, 205, 35), Color.rgb(220, 75, 0)),
+                        null, Shader.TileMode.CLAMP)
+                    setShadowLayer(24f, 0f, 0f, Color.YELLOW)
+                    alpha = glowAlpha
+                }
+                canvas.drawCircle(x, y, r.coerceAtLeast(1f), ball)
+                ball.shader = null
+                ball.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
+                ball.color = Color.argb(glowAlpha, 255, 245, 150)
+                ball.style = Paint.Style.STROKE
+                ball.strokeWidth = 5f
+                canvas.drawCircle(x, y, r.coerceAtLeast(1f), ball)
+            }
+
+            // Šenrono žalčio formos švytintis siluetas – pirmasis animacijos prototipas.
+            val dragonAlpha = if (exiting) (255f * (1f - p)).toInt() else 245
+            val dragon = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(dragonAlpha, 35, 205, 95)
+                style = Paint.Style.STROKE
+                strokeWidth = 42f
+                strokeCap = Paint.Cap.ROUND
+                strokeJoin = Paint.Join.ROUND
+                setShadowLayer(28f, 0f, 0f, Color.GREEN)
+            }
+            val path = Path().apply {
+                moveTo(300f, 510f)
+                cubicTo(70f, 260f, 880f, 250f, 700f, 560f)
+                cubicTo(560f, 800f, 900f, 930f, 690f, 1080f)
+                cubicTo(480f, 1230f, 190f, 1080f, 330f, 900f)
+            }
+            canvas.drawPath(path, dragon)
+            val headX = 300f + 35f * sin(p * 5f).toFloat()
+            val head = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(dragonAlpha, 40, 220, 110)
+                style = Paint.Style.FILL
+                setShadowLayer(35f, 0f, 0f, Color.GREEN)
+            }
+            canvas.drawOval(headX - 75f, 455f, headX + 75f, 570f, head)
+            val eye = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(dragonAlpha, 255, 235, 70) }
+            canvas.drawCircle(headX + 35f, 495f, 11f, eye)
+
+            if (!exiting) {
+                val title = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.WHITE
+                    textAlign = Paint.Align.CENTER
+                    textSize = 76f
+                    typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+                    setShadowLayer(18f, 0f, 0f, Color.rgb(255, 170, 0))
+                }
+                canvas.drawText("SAKYK SAVO NORĄ", 512f, 1370f, title)
+                if (wishButtonAlpha > 0f) {
+                    val button = RectF(160f, 1450f, 864f, 1575f)
+                    val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = Color.argb((255f * wishButtonAlpha).toInt(), 220, 105, 0)
+                        setShadowLayer(22f, 0f, 0f, Color.YELLOW)
+                    }
+                    canvas.drawRoundRect(button, 28f, 28f, fill)
+                    val label = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = Color.argb((255f * wishButtonAlpha).toInt(), 255, 255, 255)
+                        textAlign = Paint.Align.CENTER
+                        textSize = 43f
+                        typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+                    }
+                    canvas.drawText("NORIU PRADĖTI IŠ NAUJO", 512f, 1527f, label)
+                }
+            } else {
+                val message = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.argb((255f * (1f - p * 0.25f)).toInt(), 255, 235, 125)
+                    textAlign = Paint.Align.CENTER
+                    textSize = 66f
+                    typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+                    setShadowLayer(24f, 0f, 0f, Color.YELLOW)
+                }
+                canvas.drawText("TAVO NORAS IŠPILDYTAS", 512f, 1370f, message)
+            }
+            canvas.restoreToCount(save)
+        }
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
@@ -1359,6 +1508,7 @@ class MainActivity : ComponentActivity(), LocationListener {
             }
 
             canvas.restoreToCount(save)
+            if (wishScene != 0) drawWishScene(canvas)
         }
 
         private fun drawActionButton(
@@ -1723,6 +1873,15 @@ class MainActivity : ComponentActivity(), LocationListener {
         }
 
         override fun onTouchEvent(event: MotionEvent): Boolean {
+            if (wishScene != 0) {
+                if (event.action == MotionEvent.ACTION_UP && wishScene == 1 &&
+                    wishButtonAlpha >= 0.98f) {
+                    val wx = event.x / (width / 1024f)
+                    val wy = event.y / (height / 1792f)
+                    if (wx in 160f..864f && wy in 1450f..1575f) beginWishExit()
+                }
+                return true
+            }
             if (scale <= 0f) return true
             val x = (event.x - offsetX) / scale
             val y = (event.y - offsetY) / scaleY
