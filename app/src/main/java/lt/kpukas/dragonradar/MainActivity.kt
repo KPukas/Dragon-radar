@@ -392,7 +392,7 @@ class MainActivity : ComponentActivity(), LocationListener {
                     override fun onMarkerDragStart(marker: Marker) {}
                 }
             )
-        }
+        } else null
 
         ballMarker = marker
         if (marker != null) map.overlays.add(marker) else info.text = "Šis rutulys jau surinktas, todėl žemėlapyje jo nebėra."
