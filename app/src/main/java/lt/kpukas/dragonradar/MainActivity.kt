@@ -203,6 +203,27 @@ class MainActivity : ComponentActivity(), LocationListener {
         return result
     }
 
+    private fun loadFoundBallNumbers(): Set<Int> {
+        val raw = preferences.getString("found_balls", "[]") ?: "[]"
+        return try {
+            val array = JSONArray(raw)
+            (0 until array.length()).mapNotNull { index ->
+                array.optInt(index, -1).takeIf { it in 1..7 }
+            }.toSet()
+        } catch (_: Exception) {
+            emptySet()
+        }
+    }
+
+    private fun markBallFound(number: Int) {
+        if (number !in 1..7) return
+        val found = loadFoundBallNumbers().toMutableSet()
+        found.add(number)
+        val array = JSONArray()
+        found.sorted().forEach { array.put(it) }
+        preferences.edit().putString("found_balls", array.toString()).apply()
+    }
+
     private fun createBallMarkerIcon(
         number: Int,
         diameterDp: Int = 44
@@ -683,6 +704,10 @@ class MainActivity : ComponentActivity(), LocationListener {
         // Originalus trumpas radaro pyptelėjimas, kartojamas aptikus išsaugotą rutulį.
         private val radarTone = ToneGenerator(AudioManager.STREAM_MUSIC, 65)
         private var lastSignalBeepAt = 0L
+        private var nearestUnfoundBallNumber = 0
+        private val foundDistanceMeters = 5f
+        private val foundButtonRect: RectF
+            get() = RectF(width * 0.18f, height - 390f, width * 0.82f, height - 315f)
         private val entryAnimator = ValueAnimator.ofFloat(0f, 1f, 0f).apply {
             duration = 620L
             addUpdateListener {
@@ -803,16 +828,22 @@ class MainActivity : ComponentActivity(), LocationListener {
             // Pažymėtų rutulių signalai: kryptis ir atstumas skaičiuojami pagal GPS.
             val userLocation = currentLocation
             val savedBalls = loadSavedBallLocations()
+            val foundBalls = loadFoundBallNumbers()
             var nearestDistance = Float.MAX_VALUE
             var visibleCount = 0
+            nearestUnfoundBallNumber = 0
             if (userLocation != null) {
                 for ((number, geoPoint) in savedBalls) {
+                    if (number in foundBalls) continue
                     val target = Location("dragon_ball").apply {
                         latitude = geoPoint.latitude
                         longitude = geoPoint.longitude
                     }
                     val distance = userLocation.distanceTo(target)
-                    if (distance < nearestDistance) nearestDistance = distance
+                    if (distance < nearestDistance) {
+                        nearestDistance = distance
+                        nearestUnfoundBallNumber = number
+                    }
                     if (distance <= radarRangeMeters) {
                         val bearing = Math.toRadians(userLocation.bearingTo(target).toDouble() - Math.toDegrees(deviceAzimuth.toDouble()))
                         val normalizedDistance = (distance / radarRangeMeters).coerceIn(0f, 1f)
@@ -852,15 +883,59 @@ class MainActivity : ComponentActivity(), LocationListener {
             val status = when {
                 userLocation == null -> "GPS: WAITING FOR LOCATION"
                 savedBalls.isEmpty() -> "NO DRAGON BALLS SAVED"
+                foundBalls.size == savedBalls.size -> "ALL DRAGON BALLS FOUND!"
                 visibleCount == 0 -> "NO SIGNAL WITHIN ${formatRadarDistance(radarRangeMeters)}"
                 else -> "${visibleCount} SIGNAL(S)  •  NEAREST ${formatRadarDistance(nearestDistance)}"
             }
-            canvas.drawText(status, cx, height-330f, paint)
+            val closeToBall = nearestUnfoundBallNumber != 0 &&
+                nearestDistance <= foundDistanceMeters
+            canvas.drawText(status, cx, if (closeToBall) height-445f else height-330f, paint)
             paint.textSize = 18f
             paint.color = Color.rgb(185, 255, 190)
-            canvas.drawText("RADIJUS  ${formatRadarDistance(radarRangeMeters)}  •  ${zoomLevel + 1}/4", cx, height-300f, paint)
+            canvas.drawText(
+                "RADIJUS  ${formatRadarDistance(radarRangeMeters)}  •  ${zoomLevel + 1}/4",
+                cx,
+                if (closeToBall) height-415f else height-300f,
+                paint
+            )
+            if (closeToBall) drawFoundButton(canvas)
             drawRadarControl(canvas, zoomButtonRect, "＋  PRIARTINTI", true)
             drawRadarControl(canvas, backButtonRect, "←  GRĮŽTI", false)
+        }
+
+        private fun drawFoundButton(canvas: Canvas) {
+            val rect = foundButtonRect
+            val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(
+                    rect.left, rect.top, rect.left, rect.bottom,
+                    intArrayOf(
+                        Color.rgb(255, 235, 95),
+                        Color.rgb(255, 145, 15),
+                        Color.rgb(205, 65, 0)
+                    ), null, Shader.TileMode.CLAMP
+                )
+                setShadowLayer(16f, 0f, 5f, Color.rgb(255, 135, 0))
+            }
+            canvas.drawRoundRect(rect, 24f, 24f, fill)
+            val border = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.WHITE
+                style = Paint.Style.STROKE
+                strokeWidth = 4f
+            }
+            canvas.drawRoundRect(rect, 24f, 24f, border)
+            val label = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.WHITE
+                textAlign = Paint.Align.CENTER
+                textSize = 29f
+                typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+                setShadowLayer(3f, 1f, 2f, Color.BLACK)
+            }
+            canvas.drawText(
+                "★  RADU! PAŽYMĖTI RASTU ★",
+                rect.centerX(),
+                rect.centerY() - (label.ascent() + label.descent()) / 2f,
+                label
+            )
         }
 
         private fun drawRadarControl(canvas: Canvas, rect: RectF, label: String, zoom: Boolean) {
@@ -918,6 +993,18 @@ class MainActivity : ComponentActivity(), LocationListener {
         override fun onTouchEvent(event: MotionEvent): Boolean {
             if (event.action == MotionEvent.ACTION_UP) {
                 when {
+                    foundButtonRect.contains(event.x, event.y) &&
+                        nearestUnfoundBallNumber != 0 -> {
+                        val number = nearestUnfoundBallNumber
+                        markBallFound(number)
+                        nearestUnfoundBallNumber = 0
+                        Toast.makeText(
+                            this@MainActivity,
+                            "$number žvaigždučių rutulys pažymėtas kaip rastas!",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        invalidate()
+                    }
                     zoomButtonRect.contains(event.x, event.y) -> {
                         zoomLevel = (zoomLevel + 1) % zoomRanges.size
                         invalidate()
