@@ -868,7 +868,7 @@ class MainActivity : ComponentActivity(), LocationListener {
             // Pyptelėjimas tik tada, kai bent vienas išsaugotas rutulys patenka į radaro zoną.
             // Ribojame dažnį, kad garsas būtų aiškus ir neerzintų.
             val now = SystemClock.elapsedRealtime()
-            if (visibleCount > 0 && now - lastSignalBeepAt >= 2200L) {
+            if (visibleCount > 0 && now - lastSignalBeepAt >= 850L) {
                 radarTone.startTone(ToneGenerator.TONE_PROP_BEEP, 105)
                 lastSignalBeepAt = now
             }
@@ -916,11 +916,11 @@ class MainActivity : ComponentActivity(), LocationListener {
             // Pirmi šeši rutuliai išsidėsto abipus rodyklės.
             // Septintasis visada atsiduria tiksliai virš rodyklės smaigalio.
             val positions = arrayOf(
-                Pair(-42f, -25f), Pair(-42f, 0f), Pair(-42f, 25f),
-                Pair(42f, -25f), Pair(42f, 0f), Pair(42f, 25f),
-                Pair(0f, -19f)
+                Pair(-17f, -15f), Pair(-17f, 5f), Pair(-17f, 25f),
+                Pair(17f, -15f), Pair(17f, 5f), Pair(17f, 25f),
+                Pair(0f, 0f)
             )
-            val radius = 13f
+            val radius = 10f
             val ballPaint = Paint(Paint.ANTI_ALIAS_FLAG)
             val starPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(135, 35, 0)
@@ -931,7 +931,7 @@ class MainActivity : ComponentActivity(), LocationListener {
             val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(255, 235, 135)
                 style = Paint.Style.STROKE
-                strokeWidth = 2f
+                strokeWidth = 1.5f
             }
 
             for (number in 1..7) {
@@ -960,7 +960,7 @@ class MainActivity : ComponentActivity(), LocationListener {
                     6 -> "★★★★★★"
                     else -> "★★★★★★★"
                 }
-                starPaint.textSize = if (number >= 5) 5.5f else 7f
+                starPaint.textSize = if (number >= 5) 4.5f else 5.5f
                 val label = if (number >= 5) number.toString() else stars
                 canvas.drawText(
                     label,
