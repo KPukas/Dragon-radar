@@ -834,28 +834,36 @@ class MainActivity : ComponentActivity(), LocationListener {
             val cy = rect.centerY()
 
             if (radarIcon) {
-                // Klasikinis Dragon Radar: apvalus ekranas, skenavimo žiedai,
-                // krypties linijos ir vienas aptiktos rutulio vietos taškas.
+                // Mažas klasikinio Dragon Radar ekrano ženklas:
+                // tamsus korpusas, žalias ekranas, oranžiniai rutulių taškai.
                 val screenX = cx - 8f
-                val screenY = cy + 1f
-                val screenRadius = 42f
+                val screenY = cy
+                val screenRadius = 43f
 
-                val bezel = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = Color.rgb(10, 65, 12)
+                val casing = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.rgb(8, 35, 12)
                     style = Paint.Style.FILL
                 }
-                canvas.drawCircle(screenX, screenY, screenRadius + 9f, bezel)
+                canvas.drawCircle(screenX, screenY, screenRadius + 9f, casing)
 
-                val screen = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = Color.rgb(178, 242, 105)
-                    style = Paint.Style.FILL
+                val screenFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    shader = RadialGradient(
+                        screenX - 12f, screenY - 14f, screenRadius * 1.7f,
+                        intArrayOf(
+                            Color.rgb(205, 255, 150),
+                            Color.rgb(105, 195, 65),
+                            Color.rgb(30, 105, 25)
+                        ),
+                        null,
+                        Shader.TileMode.CLAMP
+                    )
                 }
-                canvas.drawCircle(screenX, screenY, screenRadius, screen)
+                canvas.drawCircle(screenX, screenY, screenRadius, screenFill)
 
                 val grid = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = Color.rgb(35, 115, 28)
+                    color = Color.argb(190, 15, 85, 20)
                     style = Paint.Style.STROKE
-                    strokeWidth = 3.5f
+                    strokeWidth = 2.8f
                 }
                 canvas.drawCircle(screenX, screenY, 14f, grid)
                 canvas.drawCircle(screenX, screenY, 28f, grid)
@@ -869,7 +877,7 @@ class MainActivity : ComponentActivity(), LocationListener {
                 )
 
                 val sweep = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = Color.argb(105, 35, 145, 20)
+                    color = Color.argb(100, 205, 255, 130)
                     style = Paint.Style.FILL
                 }
                 val sweepPath = Path().apply {
@@ -882,32 +890,37 @@ class MainActivity : ComponentActivity(), LocationListener {
                             screenX + screenRadius,
                             screenY + screenRadius
                         ),
-                        -90f, 62f
+                        -90f, 72f
                     )
                     close()
                 }
                 canvas.drawPath(sweepPath, sweep)
 
-                val blip = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = Color.rgb(255, 116, 0)
+                val ballDot = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.rgb(255, 125, 0)
                     style = Paint.Style.FILL
                 }
-                canvas.drawCircle(screenX + 18f, screenY - 17f, 7f, blip)
-
-                val highlight = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = Color.argb(180, 225, 255, 190)
+                val ballDotRim = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.rgb(255, 225, 120)
                     style = Paint.Style.STROKE
-                    strokeWidth = 3f
+                    strokeWidth = 2f
                 }
-                canvas.drawArc(
-                    RectF(
-                        screenX - screenRadius + 5f,
-                        screenY - screenRadius + 5f,
-                        screenX + screenRadius - 5f,
-                        screenY + screenRadius - 5f
-                    ),
-                    205f, 105f, false, highlight
+                val dots = listOf(
+                    Pair(screenX + 19f, screenY - 19f),
+                    Pair(screenX - 22f, screenY + 17f),
+                    Pair(screenX + 8f, screenY + 29f)
                 )
+                dots.forEach { dot ->
+                    canvas.drawCircle(dot.first, dot.second, 5.5f, ballDot)
+                    canvas.drawCircle(dot.first, dot.second, 5.5f, ballDotRim)
+                }
+
+                val rim = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.rgb(5, 55, 12)
+                    style = Paint.Style.STROKE
+                    strokeWidth = 5f
+                }
+                canvas.drawCircle(screenX, screenY, screenRadius + 2f, rim)
             } else {
                 // GPS vietos žymeklis.
                 val pin = Path().apply {
