@@ -200,7 +200,7 @@ class MainActivity : ComponentActivity(), LocationListener {
 
         val marker = Marker(map).apply {
             position = startPoint
-            title = "Drakono rutulio vieta"
+            setTitle("Drakono rutulio vieta")
             snippet = "Laikyk nuspaudęs ir perkelk žymeklį"
             setAnchor(
                 Marker.ANCHOR_CENTER,
