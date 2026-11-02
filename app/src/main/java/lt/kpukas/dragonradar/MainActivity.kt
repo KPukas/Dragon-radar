@@ -13,8 +13,11 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.media.AudioManager
 import android.media.ToneGenerator
+import android.net.Uri
 import android.os.SystemClock
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
@@ -28,6 +31,8 @@ import android.view.animation.DecelerateInterpolator
 import android.view.animation.LinearInterpolator
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.VideoView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -674,6 +679,77 @@ class MainActivity : ComponentActivity(), LocationListener {
             "Pasirinktas $number žvaigždučių rutulys",
             Toast.LENGTH_SHORT
         ).show()
+    }
+
+
+    private fun showShenronVideo() {
+        val videoDialog = Dialog(this)
+        val root = FrameLayout(this).apply {
+            setBackgroundColor(Color.BLACK)
+        }
+        val video = VideoView(this)
+        root.addView(video, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ))
+        val restartButton = Button(this).apply {
+            text = "NORIu PRADĖTI IŠ NAUJO"
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            setBackgroundTintList(ColorStateList.valueOf(Color.rgb(225, 112, 0)))
+            alpha = 0f
+            visibility = View.GONE
+        }
+        val buttonParams = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            76
+        ).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            leftMargin = 44
+            rightMargin = 44
+            bottomMargin = 70
+        }
+        root.addView(restartButton, buttonParams)
+        videoDialog.setContentView(root)
+        videoDialog.setCancelable(false)
+        videoDialog.window?.setBackgroundDrawableResource(android.R.color.black)
+        videoDialog.show()
+        videoDialog.window?.setLayout(
+            android.view.WindowManager.LayoutParams.MATCH_PARENT,
+            android.view.WindowManager.LayoutParams.MATCH_PARENT
+        )
+        var canContinue = false
+        val handler = Handler(Looper.getMainLooper())
+        val showButton = Runnable {
+            video.pause()
+            canContinue = true
+            restartButton.visibility = View.VISIBLE
+            restartButton.animate().alpha(1f).setDuration(650).start()
+        }
+        restartButton.setOnClickListener {
+            if (!canContinue) return@setOnClickListener
+            canContinue = false
+            restartButton.animate().alpha(0f).setDuration(250).withEndAction {
+                restartButton.visibility = View.GONE
+                video.start()
+            }.start()
+        }
+        video.setVideoURI(Uri.parse("android.resource://$packageName/${R.raw.shenron}"))
+        video.setOnPreparedListener { player ->
+            player.isLooping = false
+            video.start()
+            handler.postDelayed(showButton, 7000L)
+        }
+        video.setOnCompletionListener {
+            handler.removeCallbacks(showButton)
+            preferences.edit().putString("found_balls", "[]").apply()
+            creatorView.invalidate()
+            videoDialog.dismiss()
+            creatorView.invalidate()
+        }
+        videoDialog.setOnDismissListener {
+            handler.removeCallbacks(showButton)
+        }
     }
 
     private fun showRadarScreen() {
@@ -1325,21 +1401,9 @@ class MainActivity : ComponentActivity(), LocationListener {
 
         fun startWishCelebration() {
             if (wishScene != 0) return
-            wishScene = 1
-            wishProgress = 0f
-            wishButtonAlpha = 0f
+            wishScene = 3
             wishAnimator?.cancel()
-            wishAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
-                duration = 5200L
-                interpolator = LinearInterpolator()
-                addUpdateListener {
-                    wishProgress = it.animatedValue as Float
-                    wishButtonAlpha = ((wishProgress - 0.38f) / 0.28f).coerceIn(0f, 1f)
-                    invalidate()
-                }
-                start()
-            }
-            invalidate()
+            showShenronVideo()
         }
 
         private fun beginWishExit() {
