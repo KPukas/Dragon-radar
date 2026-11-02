@@ -48,6 +48,7 @@ class MainActivity : ComponentActivity(), LocationListener {
     private var firstMapLocation = false
     private var selectedBallAlreadySaved = false
     private var radarDialog: Dialog? = null
+    private var radarView: RadarView? = null
 
     private val preferences by lazy {
         getSharedPreferences("dragon_radar_creator", Context.MODE_PRIVATE)
@@ -535,6 +536,7 @@ class MainActivity : ComponentActivity(), LocationListener {
             }
 
             map.invalidate()
+            radarView?.invalidate()
         }
     }
 
@@ -608,8 +610,21 @@ class MainActivity : ComponentActivity(), LocationListener {
     private fun showRadarScreen() {
         val dialog = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
         radarDialog = dialog
-        dialog.setContentView(RadarView(this))
-        dialog.setOnDismissListener { radarDialog = null }
+        val view = RadarView(this)
+        radarView = view
+        dialog.setContentView(view)
+        if (hasLocationPermission()) {
+            try {
+                for (provider in locationManager.getProviders(true)) {
+                    locationManager.requestLocationUpdates(provider, 1000L, 1f, this)
+                }
+            } catch (_: Exception) {}
+        }
+        dialog.setOnDismissListener {
+            radarDialog = null
+            radarView = null
+            stopLocationUpdates()
+        }
         dialog.show()
         dialog.window?.setLayout(
             android.view.WindowManager.LayoutParams.MATCH_PARENT,
@@ -727,6 +742,39 @@ class MainActivity : ComponentActivity(), LocationListener {
             val pulse = 8f + 5f * kotlin.math.abs(kotlin.math.sin(phase * Math.PI).toFloat())
             canvas.drawCircle(cx+r*.55f, cy-r*.35f, pulse, paint)
             paint.clearShadowLayer()
+            // Pažymėtų rutulių signalai: kryptis ir atstumas skaičiuojami pagal GPS.
+            val userLocation = currentLocation
+            val savedBalls = loadSavedBallLocations()
+            val radarRangeMeters = 5000f
+            var nearestDistance = Float.MAX_VALUE
+            var visibleCount = 0
+            if (userLocation != null) {
+                for ((number, geoPoint) in savedBalls) {
+                    val target = Location("dragon_ball").apply {
+                        latitude = geoPoint.latitude
+                        longitude = geoPoint.longitude
+                    }
+                    val distance = userLocation.distanceTo(target)
+                    if (distance < nearestDistance) nearestDistance = distance
+                    if (distance <= radarRangeMeters) {
+                        val bearing = Math.toRadians(userLocation.bearingTo(target).toDouble())
+                        val normalizedDistance = (distance / radarRangeMeters).coerceIn(0f, 1f)
+                        val dotRadius = r * normalizedDistance
+                        val dotX = cx + kotlin.math.sin(bearing).toFloat() * dotRadius
+                        val dotY = cy - kotlin.math.cos(bearing).toFloat() * dotRadius
+                        paint.style = Paint.Style.FILL
+                        paint.color = Color.rgb(255, 175, 25)
+                        paint.setShadowLayer(15f, 0f, 0f, Color.YELLOW)
+                        canvas.drawCircle(dotX, dotY, 9f + 3f * kotlin.math.abs(kotlin.math.sin(phase * Math.PI).toFloat()), paint)
+                        paint.clearShadowLayer()
+                        paint.color = Color.rgb(255, 245, 190)
+                        paint.textAlign = Paint.Align.LEFT
+                        paint.textSize = 20f
+                        canvas.drawText(number.toString(), dotX + 12f, dotY - 8f, paint)
+                        visibleCount++
+                    }
+                }
+            }
             canvas.restoreToCount(clip)
             paint.style = Paint.Style.FILL
             paint.color = Color.WHITE
@@ -734,8 +782,14 @@ class MainActivity : ComponentActivity(), LocationListener {
             paint.typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
             paint.textSize = 30f
             canvas.drawText("DRAGON RADAR", cx, 58f, paint)
-            paint.textSize = 22f
-            canvas.drawText("SIGNAL: SEARCHING", cx, height-90f, paint)
+            paint.textSize = 20f
+            val status = when {
+                userLocation == null -> "GPS: WAITING FOR LOCATION"
+                savedBalls.isEmpty() -> "NO DRAGON BALLS SAVED"
+                visibleCount == 0 -> "NO SIGNAL WITHIN 5 KM"
+                else -> "${visibleCount} SIGNAL(S)  •  NEAREST ${formatRadarDistance(nearestDistance)}"
+            }
+            canvas.drawText(status, cx, height-90f, paint)
             paint.color = Color.rgb(100, 255, 130)
             canvas.drawRoundRect(RectF(cx-150f,height-68f,cx+150f,height-18f),18f,18f,paint)
             paint.color = Color.rgb(5,45,15)
@@ -757,6 +811,9 @@ class MainActivity : ComponentActivity(), LocationListener {
             super.onDetachedFromWindow()
         }
     }
+
+    private fun formatRadarDistance(meters: Float): String =
+        if (meters < 1000f) "${meters.toInt()} m" else String.format(java.util.Locale.getDefault(), "%.1f km", meters / 1000f)
 
     private fun showSettings() {
         Toast.makeText(
