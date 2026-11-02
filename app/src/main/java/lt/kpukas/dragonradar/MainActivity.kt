@@ -834,19 +834,61 @@ class MainActivity : ComponentActivity(), LocationListener {
             val cy = rect.centerY()
 
             if (radarIcon) {
-                // Radaro antena ir signalą žyminčios bangos.
-                canvas.drawLine(cx - 27f, cy + 25f, cx + 22f, cy - 12f, iconPaint)
-                canvas.drawLine(cx + 22f, cy - 12f, cx + 38f, cy + 23f, iconPaint)
-                canvas.drawLine(cx - 35f, cy + 28f, cx + 42f, cy + 28f, iconPaint)
+                // Drakono rutulys su žvaigždėmis ir radaro sklidimo žiedais.
+                val ballX = cx - 8f
+                val ballY = cy + 4f
+                val ballRadius = 29f
+
+                val ballFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    shader = RadialGradient(
+                        ballX - 9f, ballY - 11f, ballRadius * 1.8f,
+                        intArrayOf(
+                            Color.rgb(255, 248, 155),
+                            Color.rgb(255, 174, 20),
+                            Color.rgb(222, 75, 0)
+                        ),
+                        null,
+                        Shader.TileMode.CLAMP
+                    )
+                }
+                canvas.drawCircle(ballX, ballY, ballRadius, ballFill)
+
+                val ballRim = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.rgb(255, 235, 120)
+                    style = Paint.Style.STROKE
+                    strokeWidth = 3.5f
+                }
+                canvas.drawCircle(ballX, ballY, ballRadius, ballRim)
+
+                val star = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.rgb(145, 25, 0)
+                    style = Paint.Style.FILL
+                }
+                fun drawMiniStar(centerX: Float, centerY: Float, radius: Float) {
+                    val path = Path()
+                    for (i in 0 until 10) {
+                        val angle = Math.toRadians(-90.0 + i * 36.0)
+                        val r = if (i % 2 == 0) radius else radius * 0.43f
+                        val px = centerX + kotlin.math.cos(angle).toFloat() * r
+                        val py = centerY + kotlin.math.sin(angle).toFloat() * r
+                        if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
+                    }
+                    path.close()
+                    canvas.drawPath(path, star)
+                }
+                drawMiniStar(ballX - 10f, ballY - 7f, 9f)
+                drawMiniStar(ballX + 11f, ballY + 9f, 9f)
+
+                iconPaint.style = Paint.Style.STROKE
+                iconPaint.strokeWidth = 7f
                 canvas.drawArc(
-                    RectF(cx - 8f, cy - 58f, cx + 58f, cy + 8f),
-                    215f, 105f, false, iconPaint
+                    RectF(ballX - 2f, ballY - 50f, ballX + 90f, ballY + 50f),
+                    285f, 150f, false, iconPaint
                 )
                 canvas.drawArc(
-                    RectF(cx - 25f, cy - 78f, cx + 80f, cy + 27f),
-                    215f, 105f, false, iconPaint
+                    RectF(ballX + 12f, ballY - 67f, ballX + 122f, ballY + 67f),
+                    285f, 150f, false, iconPaint
                 )
-                canvas.drawCircle(cx + 5f, cy - 10f, 7f, iconPaint)
             } else {
                 // GPS vietos žymeklis.
                 val pin = Path().apply {
