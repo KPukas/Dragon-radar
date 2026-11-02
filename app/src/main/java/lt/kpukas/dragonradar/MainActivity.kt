@@ -711,7 +711,6 @@ class MainActivity : ComponentActivity(), LocationListener {
             radarDialog = null
             radarView = null
             stopLocationUpdates()
-            if (loadFoundBallNumbers().size == 7) creatorView.startWishCelebration()
         }
         dialog.show()
         dialog.window?.setLayout(
@@ -748,6 +747,8 @@ class MainActivity : ComponentActivity(), LocationListener {
         private val foundDistanceMeters = 5f
         private val foundButtonRect: RectF
             get() = RectF(width * 0.18f, height - 390f, width * 0.82f, height - 315f)
+        private val summonButtonRect: RectF
+            get() = RectF(width * 0.13f, height - 475f, width * 0.87f, height - 405f)
         private val entryAnimator = ValueAnimator.ofFloat(0f, 1f, 0f).apply {
             duration = 620L
             addUpdateListener {
@@ -941,6 +942,7 @@ class MainActivity : ComponentActivity(), LocationListener {
             // Surasti rutuliai kaupiasi prie rodyklės; septintasis uždedamas tiksliai ant jos viršaus.
             drawCollectedDragonBalls(canvas, cx, arrowTop, foundBalls)
             if (closeToBall) drawFoundButton(canvas)
+            if (foundBalls.size == 7) drawSummonButton(canvas)
             drawRadarControl(canvas, zoomButtonRect, "＋  PRIARTINTI", true)
             drawRadarControl(canvas, backButtonRect, "←  GRĮŽTI", false)
         }
@@ -1037,6 +1039,34 @@ class MainActivity : ComponentActivity(), LocationListener {
             }
             path.close()
             canvas.drawPath(path, paint)
+        }
+
+        private fun drawSummonButton(canvas: Canvas) {
+            val rect = summonButtonRect
+            val pulse = 0.5f + 0.5f * sin(SystemClock.uptimeMillis() / 260f).toFloat()
+            val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(rect.left, rect.top, rect.left, rect.bottom,
+                    intArrayOf(Color.rgb(255, 250, 145), Color.rgb(255, 165, 0), Color.rgb(205, 55, 0)),
+                    null, Shader.TileMode.CLAMP)
+                setShadowLayer(18f + pulse * 12f, 0f, 4f, Color.YELLOW)
+            }
+            canvas.drawRoundRect(rect, 24f, 24f, fill)
+            val border = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.WHITE
+                style = Paint.Style.STROKE
+                strokeWidth = 4f
+            }
+            canvas.drawRoundRect(rect, 24f, 24f, border)
+            val label = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.WHITE
+                textAlign = Paint.Align.CENTER
+                textSize = 30f
+                typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+                setShadowLayer(4f, 1f, 2f, Color.BLACK)
+            }
+            canvas.drawText("🐉  KVIETI ŠENRONĄ  🐉", rect.centerX(),
+                rect.centerY() - (label.ascent() + label.descent()) / 2f, label)
+            postInvalidateOnAnimation()
         }
 
         private fun drawFoundButton(canvas: Canvas) {
@@ -1140,6 +1170,11 @@ class MainActivity : ComponentActivity(), LocationListener {
                             Toast.LENGTH_LONG
                         ).show()
                         invalidate()
+                    }
+                    summonButtonRect.contains(event.x, event.y) &&
+                        loadFoundBallNumbers().size == 7 -> {
+                        creatorView.startWishCelebration()
+                        radarDialog?.dismiss()
                     }
                     zoomButtonRect.contains(event.x, event.y) -> {
                         zoomLevel = (zoomLevel + 1) % zoomRanges.size
