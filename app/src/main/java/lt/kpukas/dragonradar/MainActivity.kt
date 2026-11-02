@@ -328,8 +328,23 @@ class MainActivity : ComponentActivity(), LocationListener {
         ballMarker = marker
         map.overlays.add(marker)
 
-        // Mėlynas dabartinės GPS vietos taškas.
+        // Mėlynas GPS taškas su trumpu išsiplėtimo impulsu.
+        var gpsPulse = 0f
+        val gpsPulseAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 650L
+            interpolator = DecelerateInterpolator()
+            addUpdateListener {
+                gpsPulse = it.animatedValue as Float
+                map.invalidate()
+            }
+        }
         val blueOverlay = object : Overlay() {
+
+            private val pulsePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.rgb(35, 145, 255)
+                style = Paint.Style.STROKE
+                strokeWidth = 4f
+            }
 
             private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(35, 120, 255)
@@ -358,6 +373,15 @@ class MainActivity : ComponentActivity(), LocationListener {
                     null
                 )
 
+                pulsePaint.alpha = (190f * (1f - gpsPulse)).toInt()
+                pulsePaint.strokeWidth = 5f * (1f - gpsPulse) + 1f
+                canvas.drawCircle(
+                    point.x.toFloat(),
+                    point.y.toFloat(),
+                    13f + 34f * gpsPulse,
+                    pulsePaint
+                )
+
                 canvas.drawCircle(
                     point.x.toFloat(),
                     point.y.toFloat(),
@@ -376,6 +400,7 @@ class MainActivity : ComponentActivity(), LocationListener {
 
         myLocationOverlay = blueOverlay
         map.overlays.add(blueOverlay)
+        gpsPulseAnimator.start()
 
         val mapParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
