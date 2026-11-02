@@ -2,6 +2,7 @@
 package lt.kpukas.dragonradar
 
 import android.Manifest
+import android.app.Dialog
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.*
@@ -9,15 +10,26 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Bundle
+import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONObject
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Overlay
 import kotlin.math.cos
+import kotlin.math.min
 import kotlin.math.sin
 
 class MainActivity : ComponentActivity(), LocationListener {
@@ -27,7 +39,11 @@ class MainActivity : ComponentActivity(), LocationListener {
 
     private var selectedBall = 1
     private var currentLocation: Location? = null
-    private var gpsRequested = false
+    private var mapDialog: Dialog? = null
+    private var mapView: MapView? = null
+    private var ballMarker: Marker? = null
+    private var myLocationOverlay: Overlay? = null
+    private var firstMapLocation = false
 
     private val preferences by lazy {
         getSharedPreferences("dragon_radar_creator", Context.MODE_PRIVATE)
@@ -36,17 +52,13 @@ class MainActivity : ComponentActivity(), LocationListener {
     private val permissionLauncher =
         registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
-        ) { result ->
-            val granted =
-                result[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-                result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-
-            if (granted) {
-                startGps()
+        ) {
+            if (hasLocationPermission()) {
+                openGpsMap()
             } else {
                 Toast.makeText(
                     this,
-                    "GPS leidimas nesuteiktas",
+                    "Reikia vietos nustatymo leidimo.",
                     Toast.LENGTH_LONG
                 ).show()
             }
@@ -54,6 +66,8 @@ class MainActivity : ComponentActivity(), LocationListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        Configuration.getInstance().userAgentValue = packageName
 
         locationManager =
             getSystemService(Context.LOCATION_SERVICE) as LocationManager
@@ -83,7 +97,7 @@ class MainActivity : ComponentActivity(), LocationListener {
 
     private fun requestGpsPermission() {
         if (hasLocationPermission()) {
-            startGps()
+            openGpsMap()
         } else {
             permissionLauncher.launch(
                 arrayOf(
@@ -95,65 +109,292 @@ class MainActivity : ComponentActivity(), LocationListener {
     }
 
     @Suppress("MissingPermission")
-    private fun startGps() {
-        if (!hasLocationPermission()) return
-
+    private fun openGpsMap() {
         try {
+            currentLocation = null
+            firstMapLocation = false
+
             val providers = locationManager.getProviders(true)
 
             for (provider in providers) {
                 val last = locationManager.getLastKnownLocation(provider)
-                if (last != null) {
+                if (last != null &&
+                    (currentLocation == null ||
+                     last.time > currentLocation!!.time)
+                ) {
                     currentLocation = last
-                    break
                 }
             }
 
-            locationManager.requestLocationUpdates(
-                LocationManager.GPS_PROVIDER,
-                2000L,
-                1f,
-                this
-            )
+            showMapDialog()
 
-            gpsRequested = true
-            creatorView.invalidate()
+            for (provider in providers) {
+                try {
+                    locationManager.requestLocationUpdates(
+                        provider,
+                        2000L,
+                        2f,
+                        this
+                    )
+                } catch (_: Exception) {
+                }
+            }
+
+            currentLocation?.let {
+                updateMapLocation(it)
+            }
 
             Toast.makeText(
                 this,
-                "Ieškoma GPS vietos...",
+                "Nustatoma tavo GPS vieta...",
                 Toast.LENGTH_SHORT
             ).show()
 
         } catch (e: Exception) {
             Toast.makeText(
                 this,
-                "GPS klaida: ${e.localizedMessage ?: "nepavyko įjungti"}",
+                "GPS klaida: ${e.localizedMessage}",
                 Toast.LENGTH_LONG
             ).show()
+        }
+    }
+
+    private fun showMapDialog() {
+        val dialog = Dialog(this)
+        mapDialog = dialog
+
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(12, 12, 12, 12)
+            setBackgroundColor(Color.WHITE)
+        }
+
+        val title = TextView(this).apply {
+            text = "PAŽYMĖK ${selectedBall} ŽVAIGŽDUTĖS RUTULĮ"
+            textSize = 18f
+            setTextColor(Color.BLACK)
+            gravity = Gravity.CENTER
+            setPadding(8, 12, 8, 12)
+        }
+
+        val info = TextView(this).apply {
+            text = "Mėlynas taškas – tavo vieta. Oranžinį žymeklį gali perkelti."
+            textSize = 14f
+            setTextColor(Color.DKGRAY)
+            gravity = Gravity.CENTER
+            setPadding(8, 8, 8, 12)
+        }
+
+        val map = MapView(this)
+        mapView = map
+
+        map.setTileSource(TileSourceFactory.MAPNIK)
+        map.setMultiTouchControls(true)
+        map.controller.setZoom(16.0)
+
+        val startPoint = currentLocation?.let {
+            GeoPoint(it.latitude, it.longitude)
+        } ?: GeoPoint(54.8985, 23.9036)
+
+        map.controller.setCenter(startPoint)
+
+        val marker = Marker(map).apply {
+            position = startPoint
+            title = "Drakono rutulio vieta"
+            snippet = "Laikyk nuspaudęs ir perkelk žymeklį"
+            setAnchor(
+                Marker.ANCHOR_CENTER,
+                Marker.ANCHOR_BOTTOM
+            )
+            setDraggable(true)
+
+            setOnMarkerDragListener(
+                object : Marker.OnMarkerDragListener {
+                    override fun onMarkerDrag(marker: Marker) {}
+
+                    override fun onMarkerDragEnd(marker: Marker) {
+                        info.text = "Rutulio žymeklis perkeltas. Patikrink vietą ir patvirtink."
+                    }
+
+                    override fun onMarkerDragStart(marker: Marker) {}
+                }
+            )
+        }
+
+        ballMarker = marker
+        map.overlays.add(marker)
+
+        val blueOverlay = object : Overlay() {
+            private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.rgb(35, 120, 255)
+                style = Paint.Style.FILL
+            }
+
+            private val border = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.WHITE
+                style = Paint.Style.STROKE
+                strokeWidth = 5f
+            }
+
+            override fun draw(
+                canvas: Canvas,
+                mapView: MapView,
+                shadow: Boolean
+            ) {
+                super.draw(canvas, mapView, shadow)
+                if (shadow) return
+
+                val location = currentLocation ?: return
+                val point = mapView.projection.toPixels(
+                    GeoPoint(location.latitude, location.longitude),
+                    null
+                )
+
+                canvas.drawCircle(
+                    point.x.toFloat(),
+                    point.y.toFloat(),
+                    13f,
+                    paint
+                )
+                canvas.drawCircle(
+                    point.x.toFloat(),
+                    point.y.toFloat(),
+                    13f,
+                    border
+                )
+            }
+        }
+
+        myLocationOverlay = blueOverlay
+        map.overlays.add(blueOverlay)
+
+        val mapParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            0,
+            1f
+        )
+
+        layout.addView(title)
+        layout.addView(info)
+        layout.addView(map, mapParams)
+
+        val buttons = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+
+        val myLocationButton = Button(this).apply {
+            text = "MANO VIETA"
+            setOnClickListener {
+                currentLocation?.let { location ->
+                    map.controller.animateTo(
+                        GeoPoint(location.latitude, location.longitude)
+                    )
+                } ?: Toast.makeText(
+                    this@MainActivity,
+                    "Dar laukiama GPS signalo.",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+
+        val confirmButton = Button(this).apply {
+            text = "PATVIRTINTI VIETĄ"
+            setOnClickListener {
+                val point = ballMarker?.position
+                if (point == null) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Nėra pasirinktos vietos.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    saveSelectedBallLocation(
+                        point.latitude,
+                        point.longitude
+                    )
+
+                    stopLocationUpdates()
+                    dialog.dismiss()
+
+                    Toast.makeText(
+                        this@MainActivity,
+                        "${selectedBall} žvaigždutės rutulio vieta išsaugota!",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+
+        buttons.addView(
+            myLocationButton,
+            LinearLayout.LayoutParams(0, 58, 1f)
+        )
+        buttons.addView(
+            confirmButton,
+            LinearLayout.LayoutParams(0, 58, 1f)
+        )
+
+        layout.addView(buttons)
+
+        dialog.setContentView(layout)
+        dialog.setOnDismissListener {
+            stopLocationUpdates()
+            mapView = null
+            ballMarker = null
+            myLocationOverlay = null
+            mapDialog = null
+        }
+
+        dialog.show()
+
+        dialog.window?.setLayout(
+            (resources.displayMetrics.widthPixels * 0.96f).toInt(),
+            (resources.displayMetrics.heightPixels * 0.90f).toInt()
+        )
+
+        map.invalidate()
+    }
+
+    private fun updateMapLocation(location: Location) {
+        currentLocation = location
+
+        runOnUiThread {
+            val map = mapView ?: return@runOnUiThread
+
+            if (!firstMapLocation) {
+                firstMapLocation = true
+
+                val point = GeoPoint(
+                    location.latitude,
+                    location.longitude
+                )
+
+                map.controller.animateTo(point)
+                ballMarker?.position = point
+            }
+
+            map.invalidate()
         }
     }
 
     override fun onLocationChanged(location: Location) {
-        currentLocation = location
-        creatorView.invalidate()
+        updateMapLocation(location)
+    }
 
-        if (gpsRequested) {
-            saveSelectedBallLocation()
-            gpsRequested = false
-            locationManager.removeUpdates(this)
-
-            Toast.makeText(
-                this,
-                "Pažymėta ${selectedBall} žvaigždutės rutulio vieta!",
-                Toast.LENGTH_LONG
-            ).show()
+    private fun stopLocationUpdates() {
+        try {
+            if (hasLocationPermission()) {
+                locationManager.removeUpdates(this)
+            }
+        } catch (_: Exception) {
         }
     }
 
-    private fun saveSelectedBallLocation() {
-        val location = currentLocation ?: return
-
+    private fun saveSelectedBallLocation(
+        latitude: Double,
+        longitude: Double
+    ) {
         val raw = preferences.getString("balls", "[]") ?: "[]"
 
         val oldArray = try {
@@ -175,8 +416,8 @@ class MainActivity : ComponentActivity(), LocationListener {
 
         saved[selectedBall] = JSONObject()
             .put("number", selectedBall)
-            .put("latitude", location.latitude)
-            .put("longitude", location.longitude)
+            .put("latitude", latitude)
+            .put("longitude", longitude)
 
         val newArray = JSONArray()
 
@@ -199,7 +440,7 @@ class MainActivity : ComponentActivity(), LocationListener {
 
         Toast.makeText(
             this,
-            "Pasirinktas ${number} žvaigždutės rutulys",
+            "Pasirinktas $number žvaigždučių rutulys",
             Toast.LENGTH_SHORT
         ).show()
     }
@@ -207,7 +448,7 @@ class MainActivity : ComponentActivity(), LocationListener {
     private fun handleMapChoice() {
         Toast.makeText(
             this,
-            "Žemėlapio pasirinkimas bus prijungtas kitame etape.",
+            "Žymėjimas žemėlapyje bus prijungtas kitame etape.",
             Toast.LENGTH_LONG
         ).show()
     }
@@ -239,21 +480,19 @@ class MainActivity : ComponentActivity(), LocationListener {
 
     override fun onPause() {
         super.onPause()
-
-        if (::locationManager.isInitialized && hasLocationPermission()) {
-            locationManager.removeUpdates(this)
-        }
+        stopLocationUpdates()
+        mapView?.onPause()
     }
 
     override fun onResume() {
         super.onResume()
+        mapView?.onResume()
+    }
 
-        if (::locationManager.isInitialized &&
-            hasLocationPermission() &&
-            gpsRequested
-        ) {
-            startGps()
-        }
+    override fun onDestroy() {
+        stopLocationUpdates()
+        mapView?.onDetach()
+        super.onDestroy()
     }
 
     private inner class CreatorView(context: Context) : View(context) {
@@ -267,7 +506,6 @@ class MainActivity : ComponentActivity(), LocationListener {
             null
         }
 
-        // Rutulių centrai bendroje 1184 x 1280 koordinačių sistemoje.
         private val ballCenters = arrayOf(
             Pair(252f, 335f),
             Pair(480f, 335f),
@@ -280,11 +518,7 @@ class MainActivity : ComponentActivity(), LocationListener {
 
         private val ballRadius = 86f
 
-        private val ballPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(255, 153, 0)
-            style = Paint.Style.FILL
-        }
-
+        private val ballPaint = Paint(Paint.ANTI_ALIAS_FLAG)
         private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.rgb(255, 225, 80)
             style = Paint.Style.STROKE
@@ -307,19 +541,20 @@ class MainActivity : ComponentActivity(), LocationListener {
             strokeWidth = 5f
         }
 
-        private var scaleX = 1f
-        private var scaleY = 1f
+        private var scale = 1f
+        private var offsetX = 0f
+        private var offsetY = 0f
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
 
+            scale = min(width / 1184f, height / 1280f)
+            offsetX = (width - 1184f * scale) / 2f
+            offsetY = (height - 1280f * scale) / 2f
+
             val save = canvas.save()
-
-            // Ekranas ir fonas naudoja vienodą koordinačių sistemą.
-            scaleX = width / 1184f
-            scaleY = height / 1280f
-
-            canvas.scale(scaleX, scaleY)
+            canvas.translate(offsetX, offsetY)
+            canvas.scale(scale, scale)
 
             if (backgroundBitmap != null) {
                 canvas.drawBitmap(
@@ -332,7 +567,6 @@ class MainActivity : ComponentActivity(), LocationListener {
                 canvas.drawColor(Color.rgb(12, 48, 105))
             }
 
-            // Nupiešiami visi septyni skirtingi rutuliai.
             for (number in 1..7) {
                 drawDragonBall(canvas, number)
             }
@@ -360,7 +594,6 @@ class MainActivity : ComponentActivity(), LocationListener {
 
             canvas.drawCircle(x, y, ballRadius, ballPaint)
             ballPaint.shader = null
-
             canvas.drawCircle(x, y, ballRadius, edgePaint)
 
             canvas.drawOval(
@@ -372,28 +605,19 @@ class MainActivity : ComponentActivity(), LocationListener {
             )
 
             val positions = when (number) {
-                1 -> listOf(
-                    Pair(0f, 0f)
-                )
-
-                2 -> listOf(
-                    Pair(-22f, 0f),
-                    Pair(22f, 0f)
-                )
-
+                1 -> listOf(Pair(0f, 0f))
+                2 -> listOf(Pair(-22f, 0f), Pair(22f, 0f))
                 3 -> listOf(
                     Pair(0f, -24f),
                     Pair(-22f, 18f),
                     Pair(22f, 18f)
                 )
-
                 4 -> listOf(
                     Pair(-22f, -22f),
                     Pair(22f, -22f),
                     Pair(-22f, 22f),
                     Pair(22f, 22f)
                 )
-
                 5 -> listOf(
                     Pair(0f, -30f),
                     Pair(-29f, -8f),
@@ -401,7 +625,6 @@ class MainActivity : ComponentActivity(), LocationListener {
                     Pair(-18f, 27f),
                     Pair(18f, 27f)
                 )
-
                 6 -> listOf(
                     Pair(-25f, -25f),
                     Pair(25f, -25f),
@@ -410,7 +633,6 @@ class MainActivity : ComponentActivity(), LocationListener {
                     Pair(-25f, 25f),
                     Pair(25f, 25f)
                 )
-
                 else -> listOf(
                     Pair(0f, -34f),
                     Pair(-29f, -17f),
@@ -422,11 +644,11 @@ class MainActivity : ComponentActivity(), LocationListener {
                 )
             }
 
-            positions.forEach { position ->
+            positions.forEach {
                 drawStar(
                     canvas,
-                    x + position.first,
-                    y + position.second,
+                    x + it.first,
+                    y + it.second,
                     19f
                 )
             }
@@ -452,74 +674,17 @@ class MainActivity : ComponentActivity(), LocationListener {
 
             for (i in 0 until 10) {
                 val angle = Math.toRadians(-90.0 + i * 36.0)
-
-                val r = if (i % 2 == 0) {
-                    radius
-                } else {
-                    innerRadius
-                }
+                val r = if (i % 2 == 0) radius else innerRadius
 
                 val px = centerX + cos(angle).toFloat() * r
                 val py = centerY + sin(angle).toFloat() * r
 
-                if (i == 0) {
-                    path.moveTo(px, py)
-                } else {
-                    path.lineTo(px, py)
-                }
+                if (i == 0) path.moveTo(px, py)
+                else path.lineTo(px, py)
             }
 
             path.close()
             canvas.drawPath(path, starPaint)
         }
 
-        override fun onTouchEvent(event: MotionEvent): Boolean {
-            if (event.action != MotionEvent.ACTION_UP) {
-                return true
-            }
-
-            val x = event.x / scaleX
-            val y = event.y / scaleY
-
-            // Rutulių pasirinkimas.
-            for (number in 1..7) {
-                val center = ballCenters[number - 1]
-                val dx = x - center.first
-                val dy = y - center.second
-
-                if (
-                    dx * dx + dy * dy <=
-                    ballRadius * ballRadius * 1.5f
-                ) {
-                    selectBall(number)
-                    return true
-                }
-            }
-
-            // GPS ir žemėlapio pasirinkimai.
-            if (y in 755f..855f) {
-                if (x < 590f) {
-                    requestGpsPermission()
-                } else {
-                    handleMapChoice()
-                }
-
-                return true
-            }
-
-            // Apatinis GPS mygtukas.
-            if (y in 1100f..1250f) {
-                requestGpsPermission()
-                return true
-            }
-
-            // Nustatymų mygtukas.
-            if (x > 940f && y < 140f) {
-                showSettings()
-                return true
-            }
-
-            return true
-        }
-    }
-}
+        override fun onTouc
