@@ -694,10 +694,35 @@ class MainActivity : ComponentActivity(), LocationListener {
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
 
-            // Pirmiausia užpildome visą ekraną fonu.
-            // Paveikslėlį tik sumažiname tiek, kad visas tilptų – jo nek apojame.
-            canvas.drawColor(Color.rgb(12, 48, 105))
+            // Kraštus užpildome tuo pačiu paveikslėliu, tik švelniai
+            // išplėstu ir sulietu – nelieka matomos mėlynos juostos ar siūlės.
+            val bitmap = backgroundBitmap
+            if (bitmap != null && width > 0 && height > 0) {
+                val backdropPaint = Paint(
+                    Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG
+                ).apply {
+                    alpha = 105
+                    colorFilter = android.graphics.ColorMatrixColorFilter(
+                        floatArrayOf(
+                            0.72f, 0f, 0f, 0f, 0f,
+                            0f, 0.72f, 0f, 0f, 0f,
+                            0f, 0f, 0.82f, 0f, 0f,
+                            0f, 0f, 0f, 1f, 0f
+                        )
+                    )
+                }
+                canvas.drawBitmap(
+                    bitmap,
+                    null,
+                    RectF(0f, 0f, width.toFloat(), height.toFloat()),
+                    backdropPaint
+                )
+                canvas.drawColor(Color.argb(95, 5, 16, 38))
+            } else {
+                canvas.drawColor(Color.rgb(12, 48, 105))
+            }
 
+            // Pagrindinis paveikslėlis visada telpa visas, išlaikant proporcijas.
             scale = minOf(
                 width / 1184f,
                 height / 1280f
@@ -711,47 +736,32 @@ class MainActivity : ComponentActivity(), LocationListener {
             canvas.translate(offsetX, offsetY)
             canvas.scale(scale, scale)
 
-            if (backgroundBitmap != null) {
+            if (bitmap != null) {
                 canvas.drawBitmap(
-                    backgroundBitmap,
+                    bitmap,
                     null,
                     RectF(0f, 0f, 1184f, 1280f),
                     Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
                 )
             }
 
-            // Vienas aiškus GPS žymėjimo mygtukas.
-            val buttonRect = RectF(
-                176f,
-                760f,
-                1008f,
-                850f
-            )
-
-            canvas.drawRoundRect(
-                buttonRect,
-                22f,
-                22f,
+            // Aktyvus GPS žymėjimas ir būsimas radaro režimas.
+            drawActionButton(
+                canvas,
+                RectF(176f, 760f, 1008f, 850f),
+                "PAŽYMĖTI PAGAL GPS",
                 gpsButtonPaint
             )
 
-            canvas.drawRoundRect(
-                buttonRect,
-                22f,
-                22f,
-                gpsButtonBorderPaint
-            )
-
-            val buttonText = "PAŽYMĖTI PAGAL GPS"
-            val textY = buttonRect.centerY() -
-                    (gpsButtonTextPaint.ascent() +
-                            gpsButtonTextPaint.descent()) / 2f
-
-            canvas.drawText(
-                buttonText,
-                buttonRect.centerX(),
-                textY,
-                gpsButtonTextPaint
+            val radarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.rgb(22, 65, 125)
+                style = Paint.Style.FILL
+            }
+            drawActionButton(
+                canvas,
+                RectF(176f, 870f, 1008f, 960f),
+                "RADARAS",
+                radarPaint
             )
 
             for (number in 1..7) {
@@ -759,6 +769,21 @@ class MainActivity : ComponentActivity(), LocationListener {
             }
 
             canvas.restoreToCount(save)
+        }
+
+        private fun drawActionButton(
+            canvas: Canvas,
+            rect: RectF,
+            label: String,
+            fillPaint: Paint
+        ) {
+            canvas.drawRoundRect(rect, 22f, 22f, fillPaint)
+            canvas.drawRoundRect(rect, 22f, 22f, gpsButtonBorderPaint)
+
+            val textY = rect.centerY() -
+                    (gpsButtonTextPaint.ascent() +
+                            gpsButtonTextPaint.descent()) / 2f
+            canvas.drawText(label, rect.centerX(), textY, gpsButtonTextPaint)
         }
 
         private fun drawDragonBall(canvas: Canvas, number: Int) {
@@ -915,9 +940,19 @@ class MainActivity : ComponentActivity(), LocationListener {
                 }
             }
 
-            // GPS mygtukas.
+            // GPS žymėjimo mygtukas.
             if (x in 176f..1008f && y in 755f..855f) {
                 requestGpsPermission()
+                return true
+            }
+
+            // Radaro vieta rezervuota būsimai rutulių paieškai.
+            if (x in 176f..1008f && y in 865f..965f) {
+                Toast.makeText(
+                    context,
+                    "Radaro paieškos funkcija bus įjungta kitame etape.",
+                    Toast.LENGTH_SHORT
+                ).show()
                 return true
             }
 
