@@ -788,10 +788,12 @@ class MainActivity : ComponentActivity(), LocationListener {
             paint.color = Color.RED
             val arrowSize = 5f
             val arrow = Path().apply {
+                // Rodyklės viršūnė ir plotis lieka toje pačioje vietoje;
+                // keičiame tik jos aukštį – pailginame žemyn.
                 moveTo(cx, cy-r*.04f)
-                lineTo(cx-arrowSize, cy+r*.16f)
-                lineTo(cx, cy+r*.10f)
-                lineTo(cx+arrowSize, cy+r*.16f)
+                lineTo(cx-arrowSize, cy+r*.23f)
+                lineTo(cx, cy+r*.15f)
+                lineTo(cx+arrowSize, cy+r*.23f)
                 close()
             }
             paint.setShadowLayer(7f, 0f, 0f, Color.RED)
