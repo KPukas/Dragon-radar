@@ -745,23 +745,22 @@ class MainActivity : ComponentActivity(), LocationListener {
                 )
             }
 
-            // Aktyvus GPS žymėjimas ir būsimas radaro režimas.
+            // Radaro mygtukas perkeliamas į buvusią GPS mygtuko vietą.
             drawActionButton(
                 canvas,
                 RectF(176f, 760f, 1008f, 850f),
-                "PAŽYMĖTI PAGAL GPS",
-                gpsButtonPaint
+                "RADARAS",
+                Color.rgb(85, 205, 35),
+                true
             )
 
-            val radarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.rgb(22, 65, 125)
-                style = Paint.Style.FILL
-            }
+            // GPS žymėjimas lieka apačioje, oranžinio paveikslėlio mygtuko vietoje.
             drawActionButton(
                 canvas,
-                RectF(176f, 870f, 1008f, 960f),
-                "RADARAS",
-                radarPaint
+                RectF(176f, 1080f, 1008f, 1190f),
+                "ŽYMĖTI PAGAL GPS",
+                Color.rgb(255, 153, 0),
+                false
             )
 
             for (number in 1..7) {
@@ -775,15 +774,108 @@ class MainActivity : ComponentActivity(), LocationListener {
             canvas: Canvas,
             rect: RectF,
             label: String,
-            fillPaint: Paint
+            baseColor: Int,
+            radarIcon: Boolean
         ) {
-            canvas.drawRoundRect(rect, 22f, 22f, fillPaint)
-            canvas.drawRoundRect(rect, 22f, 22f, gpsButtonBorderPaint)
+            val radius = 30f
+            val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(185, 0, 0, 0)
+                style = Paint.Style.FILL
+                setShadowLayer(12f, 0f, 7f, Color.BLACK)
+            }
+            canvas.drawRoundRect(rect, radius, radius, shadow)
 
+            val colors = if (radarIcon) {
+                intArrayOf(
+                    Color.rgb(190, 255, 95),
+                    baseColor,
+                    Color.rgb(35, 145, 20)
+                )
+            } else {
+                intArrayOf(
+                    Color.rgb(255, 220, 75),
+                    baseColor,
+                    Color.rgb(215, 85, 0)
+                )
+            }
+            val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(
+                    rect.left, rect.top, rect.left, rect.bottom,
+                    colors, null, Shader.TileMode.CLAMP
+                )
+            }
+            canvas.drawRoundRect(rect, radius, radius, fill)
+
+            val rim = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = if (radarIcon) Color.rgb(20, 95, 15) else Color.rgb(145, 55, 0)
+                style = Paint.Style.STROKE
+                strokeWidth = 9f
+            }
+            canvas.drawRoundRect(rect, radius, radius, rim)
+
+            val shine = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(105, 255, 255, 255)
+                style = Paint.Style.STROKE
+                strokeWidth = 5f
+            }
+            canvas.drawRoundRect(
+                RectF(rect.left + 9f, rect.top + 7f, rect.right - 9f, rect.bottom - 8f),
+                radius - 7f, radius - 7f, shine
+            )
+
+            val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = if (radarIcon) Color.rgb(15, 75, 15) else Color.rgb(105, 43, 0)
+                style = Paint.Style.STROKE
+                strokeWidth = 12f
+                strokeCap = Paint.Cap.ROUND
+                strokeJoin = Paint.Join.ROUND
+            }
+            val cx = rect.left + 105f
+            val cy = rect.centerY()
+
+            if (radarIcon) {
+                // Radaro antena ir signalą žyminčios bangos.
+                canvas.drawLine(cx - 27f, cy + 25f, cx + 22f, cy - 12f, iconPaint)
+                canvas.drawLine(cx + 22f, cy - 12f, cx + 38f, cy + 23f, iconPaint)
+                canvas.drawLine(cx - 35f, cy + 28f, cx + 42f, cy + 28f, iconPaint)
+                canvas.drawArc(
+                    RectF(cx - 8f, cy - 58f, cx + 58f, cy + 8f),
+                    215f, 105f, false, iconPaint
+                )
+                canvas.drawArc(
+                    RectF(cx - 25f, cy - 78f, cx + 80f, cy + 27f),
+                    215f, 105f, false, iconPaint
+                )
+                canvas.drawCircle(cx + 5f, cy - 10f, 7f, iconPaint)
+            } else {
+                // GPS vietos žymeklis.
+                val pin = Path().apply {
+                    moveTo(cx, cy + 42f)
+                    cubicTo(cx - 12f, cy + 22f, cx - 36f, cy - 1f, cx - 36f, cy - 22f)
+                    cubicTo(cx - 36f, cy - 69f, cx + 36f, cy - 69f, cx + 36f, cy - 22f)
+                    cubicTo(cx + 36f, cy - 1f, cx + 12f, cy + 22f, cx, cy + 42f)
+                    close()
+                }
+                iconPaint.style = Paint.Style.FILL
+                canvas.drawPath(pin, iconPaint)
+                val hole = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.rgb(255, 190, 35)
+                    style = Paint.Style.FILL
+                }
+                canvas.drawCircle(cx, cy - 25f, 12f, hole)
+            }
+
+            val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = if (radarIcon) Color.rgb(10, 65, 10) else Color.rgb(100, 38, 0)
+                textAlign = Paint.Align.CENTER
+                textSize = if (label.length > 15) 43f else 49f
+                typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+                setShadowLayer(1.5f, 1f, 2f, Color.argb(80, 0, 0, 0))
+            }
+            val textX = rect.centerX() + 85f
             val textY = rect.centerY() -
-                    (gpsButtonTextPaint.ascent() +
-                            gpsButtonTextPaint.descent()) / 2f
-            canvas.drawText(label, rect.centerX(), textY, gpsButtonTextPaint)
+                (textPaint.ascent() + textPaint.descent()) / 2f
+            canvas.drawText(label, textX, textY, textPaint)
         }
 
         private fun drawDragonBall(canvas: Canvas, number: Int) {
@@ -940,14 +1032,8 @@ class MainActivity : ComponentActivity(), LocationListener {
                 }
             }
 
-            // GPS žymėjimo mygtukas.
+            // Radaro mygtukas – buvusioje GPS valdiklio vietoje.
             if (x in 176f..1008f && y in 755f..855f) {
-                requestGpsPermission()
-                return true
-            }
-
-            // Radaro vieta rezervuota būsimai rutulių paieškai.
-            if (x in 176f..1008f && y in 865f..965f) {
                 Toast.makeText(
                     context,
                     "Radaro paieškos funkcija bus įjungta kitame etape.",
@@ -956,9 +1042,15 @@ class MainActivity : ComponentActivity(), LocationListener {
                 return true
             }
 
-            // Nustatymai.
-            if (x > 940f && y < 140f) {
-                showSettings()
+            // GPS žymėjimo mygtukas apačioje.
+            if (x in 176f..1008f && y in 1075f..1195f) {
+                requestGpsPermission()
+                return true
+            }
+
+            // Viršutiniame kairiajame kampe paliktas paveikslėlio išėjimo logotipas.
+            if (x < 175f && y < 175f) {
+                finish()
                 return true
             }
 
