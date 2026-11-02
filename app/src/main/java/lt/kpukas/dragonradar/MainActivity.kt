@@ -662,7 +662,7 @@ class MainActivity : ComponentActivity(), LocationListener {
         private var entryGlow = 0f
         // Keturi mastelio lygiai: kiekvienas paspaudimas priartina aplink žaidėją.
         // GPS koordinatės nekinta – keičiasi tik radaro atvaizdavimo mastelis.
-        private val zoomRanges = floatArrayOf(5000f, 2500f, 1250f, 625f)
+        private val zoomRanges = floatArrayOf(200f, 100f, 50f, 25f)
         private var zoomLevel = 0
         private val radarRangeMeters: Float
             get() = zoomRanges[zoomLevel]
@@ -744,10 +744,17 @@ class MainActivity : ComponentActivity(), LocationListener {
                 paint.clearShadowLayer()
                 paint.style = Paint.Style.FILL
             }
+            val sweepStart = Math.toRadians((scanAngle - 55f).toDouble())
             val sweep = Path().apply {
                 moveTo(cx, cy)
-                lineTo(cx, cy-r)
-                arcTo(RectF(cx-r, cy-r, cx+r, cy+r), scanAngle - 55f, 55f)
+                lineTo(
+                    cx + kotlin.math.cos(sweepStart).toFloat() * r,
+                    cy + kotlin.math.sin(sweepStart).toFloat() * r
+                )
+                arcTo(
+                    RectF(cx-r, cy-r, cx+r, cy+r),
+                    scanAngle - 55f, 55f
+                )
                 close()
             }
             paint.style = Paint.Style.FILL
@@ -769,7 +776,7 @@ class MainActivity : ComponentActivity(), LocationListener {
             paint.style = Paint.Style.FILL
             // Taikinio krypties rodyklė ir mirksintis rutulio signalas.
             paint.color = Color.RED
-            val arrowSize = 14f
+            val arrowSize = 5f
             val arrow = Path().apply {
                 moveTo(cx, cy-r*.20f)
                 lineTo(cx-arrowSize, cy+arrowSize)
@@ -838,8 +845,8 @@ class MainActivity : ComponentActivity(), LocationListener {
             canvas.drawText(status, cx, height-104f, paint)
             paint.textSize = 18f
             paint.color = Color.rgb(185, 255, 190)
-            canvas.drawText("MASTELIS  ${zoomLevel + 1}/4  •  ${formatRadarDistance(radarRangeMeters)}", cx, height-112f, paint)
-            drawRadarControl(canvas, zoomButtonRect, "＋  PRIARTINTI  ${zoomLevel + 1}/4", true)
+            canvas.drawText("RADIJUS  ${formatRadarDistance(radarRangeMeters)}  •  ${zoomLevel + 1}/4", cx, height-112f, paint)
+            drawRadarControl(canvas, zoomButtonRect, "＋  PRIARTINTI", true)
             drawRadarControl(canvas, backButtonRect, "←  GRĮŽTI", false)
         }
 
@@ -1060,13 +1067,11 @@ class MainActivity : ComponentActivity(), LocationListener {
             }
 
             // Pagrindinis paveikslėlis visada telpa visas, išlaikant proporcijas.
-            scale = minOf(
-                width / 1184f,
-                height / 1280f
-            )
-
-            offsetX = (width - 1184f * scale) / 2f
-            offsetY = (height - 1280f * scale) / 2f
+            // Naujas vertikalus maketas užpildo visą ekraną.
+            // Koordinatės skaičiuojamos 1184 × 1792 projekto erdvėje.
+            scale = width / 1184f
+            offsetX = 0f
+            offsetY = 0f
 
             val save = canvas.save()
 
@@ -1077,7 +1082,7 @@ class MainActivity : ComponentActivity(), LocationListener {
                 canvas.drawBitmap(
                     bitmap,
                     null,
-                    RectF(0f, 0f, 1184f, 1280f),
+                    RectF(0f, 0f, 1184f, 1792f),
                     Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
                 )
             }
@@ -1085,7 +1090,7 @@ class MainActivity : ComponentActivity(), LocationListener {
             // Radaro mygtukas perkeliamas į buvusią GPS mygtuko vietą.
             drawActionButton(
                 canvas,
-                RectF(176f, 760f, 1008f, 850f),
+                RectF(145f, 1370f, 1039f, 1500f),
                 "RADARAS",
                 Color.rgb(85, 205, 35),
                 true
@@ -1094,7 +1099,7 @@ class MainActivity : ComponentActivity(), LocationListener {
             // GPS žymėjimas lieka apačioje, oranžinio paveikslėlio mygtuko vietoje.
             drawActionButton(
                 canvas,
-                RectF(176f, 1080f, 1008f, 1190f),
+                RectF(145f, 1570f, 1039f, 1705f),
                 "ŽYMĖTI PAGAL GPS",
                 Color.rgb(255, 153, 0),
                 false
@@ -1475,8 +1480,8 @@ class MainActivity : ComponentActivity(), LocationListener {
 
             if (event.action == MotionEvent.ACTION_DOWN) {
                 pressedButton = when {
-                    x in 176f..1008f && y in 755f..855f -> 1
-                    x in 176f..1008f && y in 1075f..1195f -> 2
+                    x in 145f..1039f && y in 1360f..1510f -> 1
+                    x in 145f..1039f && y in 1560f..1715f -> 2
                     else -> 0
                 }
                 if (pressedButton != 0) animateButtonPress(pressedButton, true)
@@ -1505,7 +1510,7 @@ class MainActivity : ComponentActivity(), LocationListener {
                     requestGpsPermission()
                     return true
                 }
-                if (x < 175f && y < 175f) finish()
+                if (x < 145f && y < 145f) finish()
                 return true
             }
 
