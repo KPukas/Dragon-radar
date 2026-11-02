@@ -286,7 +286,7 @@ class MainActivity : ComponentActivity(), LocationListener {
                     Marker.ANCHOR_BOTTOM
                 )
 
-                title = "$number žvaigždučių rutulys"
+                this.title = "$number žvaigždučių rutulys"
                 snippet = "Šis rutulys jau pažymėtas"
             }
 
@@ -298,7 +298,7 @@ class MainActivity : ComponentActivity(), LocationListener {
             position = startPoint
             icon = createBallMarkerIcon(selectedBall, 60)
 
-            title = "$selectedBall žvaigždučių rutulys"
+            this.title = "$selectedBall žvaigždučių rutulys"
             snippet = "Laikyk nuspaudęs ir perkelk žymeklį"
 
             setAnchor(
