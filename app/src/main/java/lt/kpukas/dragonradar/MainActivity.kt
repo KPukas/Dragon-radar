@@ -16,9 +16,11 @@ import android.os.SystemClock
 import android.os.Bundle
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.View
 import android.animation.ValueAnimator
 import android.view.animation.DecelerateInterpolator
+import android.view.animation.LinearInterpolator
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -658,6 +660,16 @@ class MainActivity : ComponentActivity(), LocationListener {
         private var phase = 0f
         private var scanAngle = -90f
         private var entryGlow = 0f
+        // Radaro mastelis keičia tik vaizduojamą atstumą, ne GPS koordinates.
+        private var radarRangeMeters = 5000f
+        private val zoomDetector = ScaleGestureDetector(context,
+            object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                override fun onScale(detector: ScaleGestureDetector): Boolean {
+                    radarRangeMeters = (radarRangeMeters / detector.scaleFactor).coerceIn(250f, 50000f)
+                    invalidate()
+                    return true
+                }
+            })
         // Originalus trumpas radaro pyptelėjimas, kartojamas aptikus išsaugotą rutulį.
         private val radarTone = ToneGenerator(AudioManager.STREAM_MUSIC, 65)
         private var lastSignalBeepAt = 0L
@@ -669,8 +681,9 @@ class MainActivity : ComponentActivity(), LocationListener {
             }
         }
         private val scanAnimator = ValueAnimator.ofFloat(-90f, 270f).apply {
-            duration = 680L
-            interpolator = DecelerateInterpolator()
+            duration = 4200L
+            repeatCount = ValueAnimator.INFINITE
+            interpolator = LinearInterpolator()
             addUpdateListener {
                 scanAngle = it.animatedValue as Float
                 invalidate()
@@ -756,20 +769,20 @@ class MainActivity : ComponentActivity(), LocationListener {
             paint.style = Paint.Style.FILL
             // Taikinio krypties rodyklė ir mirksintis rutulio signalas.
             paint.color = Color.RED
+            val arrowSize = 14f
             val arrow = Path().apply {
-                moveTo(cx, cy-r*.48f); lineTo(cx-r*.09f, cy+r*.08f)
-                lineTo(cx, cy-r*.02f); lineTo(cx+r*.09f, cy+r*.08f); close()
+                moveTo(cx, cy-r*.20f)
+                lineTo(cx-arrowSize, cy+arrowSize)
+                lineTo(cx, cy+arrowSize*.45f)
+                lineTo(cx+arrowSize, cy+arrowSize)
+                close()
             }
+            paint.setShadowLayer(7f, 0f, 0f, Color.RED)
             canvas.drawPath(arrow, paint)
-            paint.color = Color.YELLOW
-            paint.setShadowLayer(18f, 0f, 0f, Color.YELLOW)
-            val pulse = 8f + 5f * kotlin.math.abs(kotlin.math.sin(phase * Math.PI).toFloat())
-            canvas.drawCircle(cx+r*.55f, cy-r*.35f, pulse, paint)
             paint.clearShadowLayer()
             // Pažymėtų rutulių signalai: kryptis ir atstumas skaičiuojami pagal GPS.
             val userLocation = currentLocation
             val savedBalls = loadSavedBallLocations()
-            val radarRangeMeters = 5000f
             var nearestDistance = Float.MAX_VALUE
             var visibleCount = 0
             if (userLocation != null) {
@@ -819,10 +832,13 @@ class MainActivity : ComponentActivity(), LocationListener {
             val status = when {
                 userLocation == null -> "GPS: WAITING FOR LOCATION"
                 savedBalls.isEmpty() -> "NO DRAGON BALLS SAVED"
-                visibleCount == 0 -> "NO SIGNAL WITHIN 5 KM"
+                visibleCount == 0 -> "NO SIGNAL WITHIN ${formatRadarDistance(radarRangeMeters)}"
                 else -> "${visibleCount} SIGNAL(S)  •  NEAREST ${formatRadarDistance(nearestDistance)}"
             }
-            canvas.drawText(status, cx, height-90f, paint)
+            canvas.drawText(status, cx, height-104f, paint)
+            paint.textSize = 18f
+            paint.color = Color.rgb(185, 255, 190)
+            canvas.drawText("MASTELIS: ${formatRadarDistance(radarRangeMeters)}  •  SUGNYBK PIRŠTAIS", cx, height-78f, paint)
             paint.color = Color.rgb(100, 255, 130)
             canvas.drawRoundRect(RectF(cx-150f,height-68f,cx+150f,height-18f),18f,18f,paint)
             paint.color = Color.rgb(5,45,15)
@@ -831,6 +847,7 @@ class MainActivity : ComponentActivity(), LocationListener {
         }
 
         override fun onTouchEvent(event: MotionEvent): Boolean {
+            zoomDetector.onTouchEvent(event)
             if (event.action == MotionEvent.ACTION_UP && event.y > height - 115f) {
                 radarDialog?.dismiss()
             }
