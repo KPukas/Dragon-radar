@@ -273,7 +273,7 @@ class MainActivity : ComponentActivity(), LocationListener {
 
         map.controller.setCenter(startPoint)
 
-        // Rodome visus kitus jau pažymėtus rutulius.
+        // Rodome visus kitus jau pažymėtus rutulius žemėlapyje.
         for ((number, point) in savedLocations) {
             if (number == selectedBall) continue
 
