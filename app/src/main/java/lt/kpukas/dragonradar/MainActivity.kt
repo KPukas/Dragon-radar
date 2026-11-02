@@ -809,6 +809,17 @@ class MainActivity : ComponentActivity(), LocationListener {
             bottomMargin = dp(140)
         }
         root.addView(restartButton, buttonParams)
+        // Pabaigoje šis juodas sluoksnis užtemdys video ir leis švelniai grįžti į radarą.
+        val fadeOverlay = View(this).apply {
+            setBackgroundColor(Color.BLACK)
+            alpha = 0f
+            isClickable = true
+            visibility = View.GONE
+        }
+        root.addView(fadeOverlay, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ))
         videoDialog.setContentView(root)
         videoDialog.setCancelable(false)
         videoDialog.window?.setBackgroundDrawableResource(android.R.color.black)
@@ -849,15 +860,24 @@ class MainActivity : ComponentActivity(), LocationListener {
         }
         video.setOnCompletionListener {
             handler.removeCallbacks(showButton)
-            preferences.edit()
-                .putString("found_balls", "[]")
-                .putString("balls", "[]")
-                .apply()
-            selectedBall = 4
-            creatorView.wishScene = 0
-            creatorView.invalidate()
-            videoDialog.dismiss()
-            creatorView.invalidate()
+            restartButton.isEnabled = false
+            fadeOverlay.visibility = View.VISIBLE
+            fadeOverlay.bringToFront()
+            fadeOverlay.alpha = 0f
+            fadeOverlay.animate()
+                .alpha(1f)
+                .setDuration(1500L)
+                .withEndAction {
+                    preferences.edit()
+                        .putString("found_balls", "[]")
+                        .putString("balls", "[]")
+                        .apply()
+                    selectedBall = 4
+                    creatorView.wishScene = 0
+                    creatorView.invalidate()
+                    videoDialog.dismiss()
+                }
+                .start()
         }
         videoDialog.setOnDismissListener {
             handler.removeCallbacks(showButton)
