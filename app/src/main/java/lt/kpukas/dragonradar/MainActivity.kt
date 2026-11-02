@@ -738,11 +738,23 @@ class MainActivity : ComponentActivity(), LocationListener {
         video.setOnPreparedListener { player ->
             player.isLooping = false
             video.start()
-            handler.postDelayed(showButton, 7000L)
+            val screenW = resources.displayMetrics.widthPixels
+            val screenH = resources.displayMetrics.heightPixels
+            val maxW = (screenW * 0.94f).toInt()
+            val maxH = (screenH * 0.72f).toInt()
+            val ratio = if (player.videoHeight > 0) player.videoWidth.toFloat() / player.videoHeight else 16f / 9f
+            val fittedW = minOf(maxW, (maxH * ratio).toInt())
+            val fittedH = (fittedW / ratio).toInt()
+            video.layoutParams = FrameLayout.LayoutParams(fittedW, fittedH, Gravity.CENTER)
+            handler.postDelayed(showButton, 8000L)
         }
         video.setOnCompletionListener {
             handler.removeCallbacks(showButton)
-            preferences.edit().putString("found_balls", "[]").apply()
+            preferences.edit()
+                .putString("found_balls", "[]")
+                .putString("balls", "[]")
+                .apply()
+            selectedBall = 4
             creatorView.wishScene = 0
             creatorView.invalidate()
             videoDialog.dismiss()
@@ -1419,7 +1431,8 @@ class MainActivity : ComponentActivity(), LocationListener {
                     wishProgress = it.animatedValue as Float
                     invalidate()
                     if (wishProgress >= 1f) {
-                        preferences.edit().putString("found_balls", "[]").apply()
+                        preferences.edit().putString("found_balls", "[]").putString("balls", "[]").apply()
+                        selectedBall = 4
                         wishScene = 0
                         wishProgress = 0f
                         wishButtonAlpha = 0f
@@ -1608,7 +1621,7 @@ class MainActivity : ComponentActivity(), LocationListener {
             }
 
             canvas.restoreToCount(save)
-            if (wishScene != 0) drawWishScene(canvas)
+            if (wishScene == 1 || wishScene == 2) drawWishScene(canvas)
         }
 
         private fun drawActionButton(
