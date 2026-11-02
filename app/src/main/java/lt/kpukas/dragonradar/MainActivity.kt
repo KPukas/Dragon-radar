@@ -128,36 +128,118 @@ class MainActivity : ComponentActivity(), LocationListener {
         return bytes.joinToString("") { "%02x".format(it) }
     }
 
+    private fun showStyledPinDialog(
+        titleText: String,
+        messageText: String,
+        hintText: String,
+        positiveText: String,
+        onPositive: (String, Dialog) -> Unit
+    ) {
+        val dialog = Dialog(this)
+        val density = resources.displayMetrics.density
+        fun dp(value: Int) = (value * density).toInt()
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(22), dp(24), dp(20))
+            setBackgroundColor(Color.rgb(5, 25, 48))
+        }
+        val title = TextView(this).apply {
+            text = titleText
+            textSize = 21f
+            typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+            setTextColor(Color.rgb(255, 180, 35))
+            gravity = Gravity.CENTER
+        }
+        val message = TextView(this).apply {
+            text = messageText
+            textSize = 14f
+            setTextColor(Color.rgb(210, 225, 240))
+            gravity = Gravity.CENTER
+            setPadding(0, dp(10), 0, dp(16))
+        }
+        val input = EditText(this).apply {
+            hint = hintText
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+            filters = arrayOf(android.text.InputFilter.LengthFilter(4))
+            textSize = 22f
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.LTGRAY)
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(255, 160, 20))
+        }
+        val buttons = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(0, dp(18), 0, 0)
+        }
+        val cancel = Button(this).apply {
+            text = "ATŠAUKTI"
+            setTextColor(Color.WHITE)
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(65, 85, 110))
+        }
+        val confirm = Button(this).apply {
+            text = positiveText
+            setTextColor(Color.WHITE)
+            backgroundTintList = ColorStateList.valueOf(Color.rgb(225, 112, 0))
+        }
+        buttons.addView(cancel, LinearLayout.LayoutParams(0, dp(52), 1f).apply { marginEnd = dp(8) })
+        buttons.addView(confirm, LinearLayout.LayoutParams(0, dp(52), 1f).apply { marginStart = dp(8) })
+        panel.addView(title)
+        panel.addView(message)
+        panel.addView(input, LinearLayout.LayoutParams(-1, dp(58)))
+        panel.addView(buttons)
+        dialog.setContentView(panel)
+        dialog.setCancelable(true)
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        cancel.setOnClickListener { dialog.dismiss() }
+        confirm.setOnClickListener { onPositive(input.text.toString(), dialog) }
+        dialog.show()
+        dialog.window?.setLayout((resources.displayMetrics.widthPixels * 0.88f).toInt(), -2)
+    }
+
     private fun showCreatePinDialog() {
-        val firstInput = EditText(this).apply { hint = "Sugalvok 4 skaitmenų PIN"; inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD; filters = arrayOf(android.text.InputFilter.LengthFilter(4)) }
-        val firstDialog = AlertDialog.Builder(this).setTitle("Sukurk GPS žemėlapio PIN").setMessage("Pasirink savo 4 skaitmenų kodą. Jo reikės kiekvieną kartą atidarant GPS žemėlapį.").setView(firstInput).setNegativeButton("ATŠAUKTI", null).setPositiveButton("TĘSTI", null).create()
-        firstDialog.setOnShowListener {
-            firstDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val pin = firstInput.text.toString()
-                if (!pin.matches(Regex("\\d{4}"))) { firstInput.error = "Įvesk tiksliai 4 skaitmenis"; return@setOnClickListener }
-                firstDialog.dismiss()
-                val confirmInput = EditText(this).apply { hint = "Pakartok PIN kodą"; inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD; filters = arrayOf(android.text.InputFilter.LengthFilter(4)) }
-                val confirmDialog = AlertDialog.Builder(this).setTitle("Patvirtink PIN kodą").setView(confirmInput).setNegativeButton("ATŠAUKTI", null).setPositiveButton("IŠSAUGOTI", null).create()
-                confirmDialog.setOnShowListener {
-                    confirmDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                        if (confirmInput.text.toString() != pin) confirmInput.error = "PIN kodai nesutampa" else { preferences.edit().putString("gps_map_pin_hash", pinHash(pin)).apply(); confirmDialog.dismiss(); continueToGpsMap() }
-                    }
+        showStyledPinDialog(
+            "SUKURK GPS PIN",
+            "Pasirink 4 skaitmenų kodą. Jo reikės kiekvieną kartą atidarant GPS žemėlapį.",
+            "4 skaitmenų PIN",
+            "TĘSTI"
+        ) { pin, firstDialog ->
+            if (!pin.matches(Regex("\\d{4}"))) {
+                Toast.makeText(this, "Įvesk tiksliai 4 skaitmenis.", Toast.LENGTH_SHORT).show()
+                return@showStyledPinDialog
+            }
+            firstDialog.dismiss()
+            showStyledPinDialog(
+                "PATVIRTINK PIN",
+                "Pakartok pasirinktą kodą.",
+                "Pakartok PIN kodą",
+                "IŠSAUGOTI"
+            ) { confirmation, secondDialog ->
+                if (confirmation != pin) {
+                    Toast.makeText(this, "PIN kodai nesutampa.", Toast.LENGTH_SHORT).show()
+                } else {
+                    preferences.edit().putString("gps_map_pin_hash", pinHash(pin)).apply()
+                    secondDialog.dismiss()
+                    continueToGpsMap()
                 }
-                confirmDialog.show()
             }
         }
-        firstDialog.show()
     }
 
     private fun showEnterPinDialog(expectedHash: String) {
-        val input = EditText(this).apply { hint = "4 skaitmenų PIN"; inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD; filters = arrayOf(android.text.InputFilter.LengthFilter(4)) }
-        val dialog = AlertDialog.Builder(this).setTitle("GPS žemėlapis užrakintas").setMessage("Įvesk savo PIN kodą, kad atidarytum žemėlapį.").setView(input).setNegativeButton("ATŠAUKTI", null).setPositiveButton("ATIDARYTI", null).create()
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                if (input.text.length == 4 && pinHash(input.text.toString()) == expectedHash) { dialog.dismiss(); continueToGpsMap() } else input.error = "Neteisingas PIN kodas"
+        showStyledPinDialog(
+            "GPS ŽEMĖLAPIS",
+            "Įvesk savo PIN kodą, kad atidarytum žemėlapį.",
+            "4 skaitmenų PIN",
+            "ATIDARYTI"
+        ) { pin, dialog ->
+            if (pin.length == 4 && pinHash(pin) == expectedHash) {
+                dialog.dismiss()
+                continueToGpsMap()
+            } else {
+                Toast.makeText(this, "Neteisingas PIN kodas.", Toast.LENGTH_SHORT).show()
             }
         }
-        dialog.show()
     }
 
     private fun continueToGpsMap() {
