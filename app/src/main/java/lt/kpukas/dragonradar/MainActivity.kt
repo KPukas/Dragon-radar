@@ -1395,7 +1395,7 @@ class MainActivity : ComponentActivity(), LocationListener {
         private var scaleY = 1f
         private var offsetX = 0f
         private var offsetY = 0f
-        private var wishScene = 0 // 0 – įprastas ekranas, 1 – noras, 2 – išnykimas
+        var wishScene = 0 // 0 – įprastas ekranas, 1 – noras, 2 – išnykimas
         private var wishProgress = 0f
         private var wishAnimator: ValueAnimator? = null
         private var wishButtonAlpha = 0f
