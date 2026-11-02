@@ -694,8 +694,11 @@ class MainActivity : ComponentActivity(), LocationListener {
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
 
-            // Užpildome ekraną, išlaikydami paveikslėlio proporcijas.
-            scale = maxOf(
+            // Pirmiausia užpildome visą ekraną fonu.
+            // Paveikslėlį tik sumažiname tiek, kad visas tilptų – jo nek apojame.
+            canvas.drawColor(Color.rgb(12, 48, 105))
+
+            scale = minOf(
                 width / 1184f,
                 height / 1280f
             )
@@ -713,10 +716,8 @@ class MainActivity : ComponentActivity(), LocationListener {
                     backgroundBitmap,
                     null,
                     RectF(0f, 0f, 1184f, 1280f),
-                    Paint(Paint.ANTI_ALIAS_FLAG)
+                    Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
                 )
-            } else {
-                canvas.drawColor(Color.rgb(12, 48, 105))
             }
 
             // Vienas aiškus GPS žymėjimo mygtukas.
