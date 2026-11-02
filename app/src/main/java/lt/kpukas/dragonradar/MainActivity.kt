@@ -675,10 +675,11 @@ class MainActivity : ComponentActivity(), LocationListener {
         private var zoomLevel = 0
         private val radarRangeMeters: Float
             get() = zoomRanges[zoomLevel]
+        // Valdiklius pakeliame aukščiau, kad jie nebūtų nukerpami ekrano apačioje.
         private val zoomButtonRect: RectF
-            get() = RectF(width * 0.06f, height - 158f, width * 0.53f, height - 82f)
+            get() = RectF(width * 0.06f, height - 285f, width * 0.53f, height - 205f)
         private val backButtonRect: RectF
-            get() = RectF(width * 0.57f, height - 158f, width * 0.94f, height - 82f)
+            get() = RectF(width * 0.57f, height - 285f, width * 0.94f, height - 205f)
         // Originalus trumpas radaro pyptelėjimas, kartojamas aptikus išsaugotą rutulį.
         private val radarTone = ToneGenerator(AudioManager.STREAM_MUSIC, 65)
         private var lastSignalBeepAt = 0L
@@ -786,14 +787,14 @@ class MainActivity : ComponentActivity(), LocationListener {
             paint.style = Paint.Style.FILL
             // Taikinio krypties rodyklė ir mirksintis rutulio signalas.
             paint.color = Color.RED
-            val arrowSize = 5f
+            val arrowHalfWidth = 5f
+            val arrowHeight = arrowHalfWidth * 4f // bendras aukštis 20 px, plotis 10 px
+            val arrowTop = cy - r * .04f
             val arrow = Path().apply {
-                // Rodyklės viršūnė ir plotis lieka toje pačioje vietoje;
-                // keičiame tik jos aukštį – pailginame žemyn.
-                moveTo(cx, cy-r*.04f)
-                lineTo(cx-arrowSize, cy+r*.23f)
-                lineTo(cx, cy+r*.15f)
-                lineTo(cx+arrowSize, cy+r*.23f)
+                moveTo(cx, arrowTop)
+                lineTo(cx-arrowHalfWidth, arrowTop + arrowHeight)
+                lineTo(cx, arrowTop + arrowHeight * .70f)
+                lineTo(cx+arrowHalfWidth, arrowTop + arrowHeight)
                 close()
             }
             paint.setShadowLayer(7f, 0f, 0f, Color.RED)
@@ -854,10 +855,10 @@ class MainActivity : ComponentActivity(), LocationListener {
                 visibleCount == 0 -> "NO SIGNAL WITHIN ${formatRadarDistance(radarRangeMeters)}"
                 else -> "${visibleCount} SIGNAL(S)  •  NEAREST ${formatRadarDistance(nearestDistance)}"
             }
-            canvas.drawText(status, cx, height-202f, paint)
+            canvas.drawText(status, cx, height-330f, paint)
             paint.textSize = 18f
             paint.color = Color.rgb(185, 255, 190)
-            canvas.drawText("RADIJUS  ${formatRadarDistance(radarRangeMeters)}  •  ${zoomLevel + 1}/4", cx, height-174f, paint)
+            canvas.drawText("RADIJUS  ${formatRadarDistance(radarRangeMeters)}  •  ${zoomLevel + 1}/4", cx, height-300f, paint)
             drawRadarControl(canvas, zoomButtonRect, "＋  PRIARTINTI", true)
             drawRadarControl(canvas, backButtonRect, "←  GRĮŽTI", false)
         }
