@@ -743,6 +743,7 @@ class MainActivity : ComponentActivity(), LocationListener {
         video.setOnCompletionListener {
             handler.removeCallbacks(showButton)
             preferences.edit().putString("found_balls", "[]").apply()
+            creatorView.wishScene = 0
             creatorView.invalidate()
             videoDialog.dismiss()
             creatorView.invalidate()
