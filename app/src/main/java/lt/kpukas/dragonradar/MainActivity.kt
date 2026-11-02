@@ -775,7 +775,7 @@ class MainActivity : ComponentActivity(), LocationListener {
             FrameLayout.LayoutParams.MATCH_PARENT
         ))
         val restartButton = Button(this).apply {
-            text = "NORIu PRADĖTI IŠ NAUJO"
+            text = "Noriu pradėti iš naujo"
             textSize = 18f
             setTextColor(Color.WHITE)
             setBackgroundTintList(ColorStateList.valueOf(Color.rgb(225, 112, 0)))
