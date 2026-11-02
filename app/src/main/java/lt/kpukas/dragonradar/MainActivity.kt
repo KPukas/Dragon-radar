@@ -1,9 +1,11 @@
+
 package lt.kpukas.dragonradar
 
 import android.Manifest
 import android.app.Dialog
 import android.content.Context
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.graphics.*
 import android.location.Location
 import android.location.LocationListener
@@ -28,7 +30,6 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Overlay
 import kotlin.math.cos
-import kotlin.math.min
 import kotlin.math.sin
 
 class MainActivity : ComponentActivity(), LocationListener {
@@ -43,6 +44,7 @@ class MainActivity : ComponentActivity(), LocationListener {
     private var ballMarker: Marker? = null
     private var myLocationOverlay: Overlay? = null
     private var firstMapLocation = false
+    private var selectedBallAlreadySaved = false
 
     private val preferences by lazy {
         getSharedPreferences("dragon_radar_creator", Context.MODE_PRIVATE)
@@ -117,9 +119,10 @@ class MainActivity : ComponentActivity(), LocationListener {
 
             for (provider in providers) {
                 val last = locationManager.getLastKnownLocation(provider)
+
                 if (last != null &&
                     (currentLocation == null ||
-                     last.time > currentLocation!!.time)
+                            last.time > currentLocation!!.time)
                 ) {
                     currentLocation = last
                 }
@@ -158,6 +161,74 @@ class MainActivity : ComponentActivity(), LocationListener {
         }
     }
 
+    private fun loadSavedBallLocations(): Map<Int, GeoPoint> {
+        val raw = preferences.getString("balls", "[]") ?: "[]"
+        val result = mutableMapOf<Int, GeoPoint>()
+
+        try {
+            val array = JSONArray(raw)
+
+            for (i in 0 until array.length()) {
+                val item = array.optJSONObject(i) ?: continue
+                val number = item.optInt("number", -1)
+
+                if (number in 1..7) {
+                    val lat = item.optDouble("latitude")
+                    val lon = item.optDouble("longitude")
+
+                    if (lat.isFinite() && lon.isFinite() &&
+                        lat in -90.0..90.0 &&
+                        lon in -180.0..180.0
+                    ) {
+                        result[number] = GeoPoint(lat, lon)
+                    }
+                }
+            }
+        } catch (_: Exception) {
+        }
+
+        return result
+    }
+
+    private fun createBallMarkerIcon(
+        number: Int,
+        diameterDp: Int = 44
+    ): android.graphics.drawable.Drawable {
+        val density = resources.displayMetrics.density
+        val size = (diameterDp * density).toInt()
+
+        val bitmap = Bitmap.createBitmap(
+            size,
+            size,
+            Bitmap.Config.ARGB_8888
+        )
+
+        val canvas = Canvas(bitmap)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val center = size / 2f
+        val radius = size * 0.39f
+
+        paint.color = Color.rgb(255, 155, 0)
+        paint.style = Paint.Style.FILL
+        canvas.drawCircle(center, center, radius, paint)
+
+        paint.color = Color.WHITE
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 3f * density
+        canvas.drawCircle(center, center, radius, paint)
+
+        paint.color = Color.WHITE
+        paint.style = Paint.Style.FILL
+        paint.textAlign = Paint.Align.CENTER
+        paint.textSize = diameterDp * 0.48f * density
+        paint.typeface = Typeface.DEFAULT_BOLD
+
+        val baseline = center - (paint.ascent() + paint.descent()) / 2f
+        canvas.drawText(number.toString(), center, baseline, paint)
+
+        return android.graphics.drawable.BitmapDrawable(resources, bitmap)
+    }
+
     private fun showMapDialog() {
         val dialog = Dialog(this)
         mapDialog = dialog
@@ -169,7 +240,7 @@ class MainActivity : ComponentActivity(), LocationListener {
         }
 
         val title = TextView(this).apply {
-            text = "PAŽYMĖK ${selectedBall} ŽVAIGŽDUTĖS RUTULĮ"
+            text = "PAŽYMĖK $selectedBall ŽVAIGŽDUČIŲ RUTULĮ"
             textSize = 18f
             setTextColor(Color.BLACK)
             gravity = Gravity.CENTER
@@ -177,7 +248,7 @@ class MainActivity : ComponentActivity(), LocationListener {
         }
 
         val info = TextView(this).apply {
-            text = "Mėlynas taškas – tavo vieta. Oranžinį žymeklį gali perkelti."
+            text = "Mėlynas taškas – tavo GPS vieta. Oranžinį žymeklį gali perkelti. Kiti oranžiniai žymekliai – jau pažymėti rutuliai."
             textSize = 14f
             setTextColor(Color.DKGRAY)
             gravity = Gravity.CENTER
@@ -191,20 +262,50 @@ class MainActivity : ComponentActivity(), LocationListener {
         map.setMultiTouchControls(true)
         map.controller.setZoom(16.0)
 
-        val startPoint = currentLocation?.let {
+        val savedLocations = loadSavedBallLocations()
+        selectedBallAlreadySaved = savedLocations.containsKey(selectedBall)
+
+        val gpsPoint = currentLocation?.let {
             GeoPoint(it.latitude, it.longitude)
         } ?: GeoPoint(54.8985, 23.9036)
 
+        val startPoint = savedLocations[selectedBall] ?: gpsPoint
+
         map.controller.setCenter(startPoint)
 
+        // Rodome visus kitus jau pažymėtus rutulius.
+        for ((number, point) in savedLocations) {
+            if (number == selectedBall) continue
+
+            val savedMarker = Marker(map).apply {
+                position = point
+                icon = createBallMarkerIcon(number)
+
+                setAnchor(
+                    Marker.ANCHOR_CENTER,
+                    Marker.ANCHOR_BOTTOM
+                )
+
+                title = "$number žvaigždučių rutulys"
+                snippet = "Šis rutulys jau pažymėtas"
+            }
+
+            map.overlays.add(savedMarker)
+        }
+
+        // Dabartinio pasirinkto rutulio žymeklis.
         val marker = Marker(map).apply {
             position = startPoint
-            setTitle("Drakono rutulio vieta")
+            icon = createBallMarkerIcon(selectedBall, 60)
+
+            title = "$selectedBall žvaigždučių rutulys"
             snippet = "Laikyk nuspaudęs ir perkelk žymeklį"
+
             setAnchor(
                 Marker.ANCHOR_CENTER,
                 Marker.ANCHOR_BOTTOM
             )
+
             setDraggable(true)
 
             setOnMarkerDragListener(
@@ -212,7 +313,8 @@ class MainActivity : ComponentActivity(), LocationListener {
                     override fun onMarkerDrag(marker: Marker) {}
 
                     override fun onMarkerDragEnd(marker: Marker) {
-                        info.text = "Rutulio žymeklis perkeltas. Patikrink vietą ir patvirtink."
+                        info.text =
+                            "Rutulio žymeklis perkeltas. Patikrink vietą ir patvirtink."
                     }
 
                     override fun onMarkerDragStart(marker: Marker) {}
@@ -223,7 +325,9 @@ class MainActivity : ComponentActivity(), LocationListener {
         ballMarker = marker
         map.overlays.add(marker)
 
+        // Mėlynas dabartinės GPS vietos taškas.
         val blueOverlay = object : Overlay() {
+
             private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.rgb(35, 120, 255)
                 style = Paint.Style.FILL
@@ -241,9 +345,11 @@ class MainActivity : ComponentActivity(), LocationListener {
                 shadow: Boolean
             ) {
                 super.draw(canvas, mapView, shadow)
+
                 if (shadow) return
 
                 val location = currentLocation ?: return
+
                 val point = mapView.projection.toPixels(
                     GeoPoint(location.latitude, location.longitude),
                     null
@@ -255,6 +361,7 @@ class MainActivity : ComponentActivity(), LocationListener {
                     13f,
                     paint
                 )
+
                 canvas.drawCircle(
                     point.x.toFloat(),
                     point.y.toFloat(),
@@ -283,7 +390,16 @@ class MainActivity : ComponentActivity(), LocationListener {
         }
 
         val myLocationButton = Button(this).apply {
-            text = "MANO VIETA"
+            text = "⌖  MANO GPS VIETA"
+            textSize = 14f
+            isAllCaps = false
+            setTextColor(Color.WHITE)
+            setTypeface(null, Typeface.BOLD)
+
+            backgroundTintList = ColorStateList.valueOf(
+                Color.rgb(25, 105, 220)
+            )
+
             setOnClickListener {
                 currentLocation?.let { location ->
                     map.controller.animateTo(
@@ -298,9 +414,19 @@ class MainActivity : ComponentActivity(), LocationListener {
         }
 
         val confirmButton = Button(this).apply {
-            text = "PATVIRTINTI VIETĄ"
+            text = "✓  PATVIRTINTI RUTULIO VIETĄ"
+            textSize = 13f
+            isAllCaps = false
+            setTextColor(Color.WHITE)
+            setTypeface(null, Typeface.BOLD)
+
+            backgroundTintList = ColorStateList.valueOf(
+                Color.rgb(235, 125, 0)
+            )
+
             setOnClickListener {
                 val point = ballMarker?.position
+
                 if (point == null) {
                     Toast.makeText(
                         this@MainActivity,
@@ -318,25 +444,30 @@ class MainActivity : ComponentActivity(), LocationListener {
 
                     Toast.makeText(
                         this@MainActivity,
-                        "${selectedBall} žvaigždutės rutulio vieta išsaugota!",
+                        "$selectedBall žvaigždučių rutulio vieta išsaugota!",
                         Toast.LENGTH_LONG
                     ).show()
                 }
             }
         }
 
+        val buttonHeight =
+            (58 * resources.displayMetrics.density).toInt()
+
         buttons.addView(
             myLocationButton,
-            LinearLayout.LayoutParams(0, 58, 1f)
+            LinearLayout.LayoutParams(0, buttonHeight, 1f)
         )
+
         buttons.addView(
             confirmButton,
-            LinearLayout.LayoutParams(0, 58, 1f)
+            LinearLayout.LayoutParams(0, buttonHeight, 1f)
         )
 
         layout.addView(buttons)
 
         dialog.setContentView(layout)
+
         dialog.setOnDismissListener {
             stopLocationUpdates()
             mapView = null
@@ -369,8 +500,10 @@ class MainActivity : ComponentActivity(), LocationListener {
                     location.longitude
                 )
 
-                map.controller.animateTo(point)
-                ballMarker?.position = point
+                if (!selectedBallAlreadySaved) {
+                    map.controller.animateTo(point)
+                    ballMarker?.position = point
+                }
             }
 
             map.invalidate()
@@ -444,14 +577,6 @@ class MainActivity : ComponentActivity(), LocationListener {
         ).show()
     }
 
-    private fun handleMapChoice() {
-        Toast.makeText(
-            this,
-            "Žymėjimas žemėlapyje bus prijungtas kitame etape.",
-            Toast.LENGTH_LONG
-        ).show()
-    }
-
     private fun showSettings() {
         Toast.makeText(
             this,
@@ -518,6 +643,7 @@ class MainActivity : ComponentActivity(), LocationListener {
         private val ballRadius = 86f
 
         private val ballPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
         private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.rgb(255, 225, 80)
             style = Paint.Style.STROKE
@@ -540,6 +666,27 @@ class MainActivity : ComponentActivity(), LocationListener {
             strokeWidth = 5f
         }
 
+        private val gpsButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(25, 145, 75)
+            style = Paint.Style.FILL
+        }
+
+        private val gpsButtonBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 4f
+        }
+
+        private val gpsButtonTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textAlign = Paint.Align.CENTER
+            textSize = 34f
+            typeface = Typeface.create(
+                Typeface.DEFAULT,
+                Typeface.BOLD
+            )
+        }
+
         private var scale = 1f
         private var offsetX = 0f
         private var offsetY = 0f
@@ -547,11 +694,17 @@ class MainActivity : ComponentActivity(), LocationListener {
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
 
-            scale = min(width / 1184f, height / 1280f)
+            // Užpildome ekraną, išlaikydami paveikslėlio proporcijas.
+            scale = maxOf(
+                width / 1184f,
+                height / 1280f
+            )
+
             offsetX = (width - 1184f * scale) / 2f
             offsetY = (height - 1280f * scale) / 2f
 
             val save = canvas.save()
+
             canvas.translate(offsetX, offsetY)
             canvas.scale(scale, scale)
 
@@ -565,6 +718,40 @@ class MainActivity : ComponentActivity(), LocationListener {
             } else {
                 canvas.drawColor(Color.rgb(12, 48, 105))
             }
+
+            // Vienas aiškus GPS žymėjimo mygtukas.
+            val buttonRect = RectF(
+                176f,
+                760f,
+                1008f,
+                850f
+            )
+
+            canvas.drawRoundRect(
+                buttonRect,
+                22f,
+                22f,
+                gpsButtonPaint
+            )
+
+            canvas.drawRoundRect(
+                buttonRect,
+                22f,
+                22f,
+                gpsButtonBorderPaint
+            )
+
+            val buttonText = "PAŽYMĖTI PAGAL GPS"
+            val textY = buttonRect.centerY() -
+                    (gpsButtonTextPaint.ascent() +
+                            gpsButtonTextPaint.descent()) / 2f
+
+            canvas.drawText(
+                buttonText,
+                buttonRect.centerX(),
+                textY,
+                gpsButtonTextPaint
+            )
 
             for (number in 1..7) {
                 drawDragonBall(canvas, number)
@@ -592,8 +779,15 @@ class MainActivity : ComponentActivity(), LocationListener {
             )
 
             canvas.drawCircle(x, y, ballRadius, ballPaint)
+
             ballPaint.shader = null
-            canvas.drawCircle(x, y, ballRadius, edgePaint)
+
+            canvas.drawCircle(
+                x,
+                y,
+                ballRadius,
+                edgePaint
+            )
 
             canvas.drawOval(
                 x - 62f,
@@ -605,18 +799,25 @@ class MainActivity : ComponentActivity(), LocationListener {
 
             val positions = when (number) {
                 1 -> listOf(Pair(0f, 0f))
-                2 -> listOf(Pair(-22f, 0f), Pair(22f, 0f))
+
+                2 -> listOf(
+                    Pair(-22f, 0f),
+                    Pair(22f, 0f)
+                )
+
                 3 -> listOf(
                     Pair(0f, -24f),
                     Pair(-22f, 18f),
                     Pair(22f, 18f)
                 )
+
                 4 -> listOf(
                     Pair(-22f, -22f),
                     Pair(22f, -22f),
                     Pair(-22f, 22f),
                     Pair(22f, 22f)
                 )
+
                 5 -> listOf(
                     Pair(0f, -30f),
                     Pair(-29f, -8f),
@@ -624,6 +825,7 @@ class MainActivity : ComponentActivity(), LocationListener {
                     Pair(-18f, 27f),
                     Pair(18f, 27f)
                 )
+
                 6 -> listOf(
                     Pair(-25f, -25f),
                     Pair(25f, -25f),
@@ -632,6 +834,7 @@ class MainActivity : ComponentActivity(), LocationListener {
                     Pair(-25f, 25f),
                     Pair(25f, 25f)
                 )
+
                 else -> listOf(
                     Pair(0f, -34f),
                     Pair(-29f, -17f),
@@ -678,15 +881,17 @@ class MainActivity : ComponentActivity(), LocationListener {
                 val px = centerX + cos(angle).toFloat() * r
                 val py = centerY + sin(angle).toFloat() * r
 
-                if (i == 0) path.moveTo(px, py)
-                else path.lineTo(px, py)
+                if (i == 0) {
+                    path.moveTo(px, py)
+                } else {
+                    path.lineTo(px, py)
+                }
             }
 
             path.close()
             canvas.drawPath(path, starPaint)
         }
 
-        
         override fun onTouchEvent(event: MotionEvent): Boolean {
             if (event.action != MotionEvent.ACTION_UP) {
                 return true
@@ -697,7 +902,7 @@ class MainActivity : ComponentActivity(), LocationListener {
             val x = (event.x - offsetX) / scale
             val y = (event.y - offsetY) / scale
 
-            // Rutulių pasirinkimas
+            // Rutulių pasirinkimas.
             for (number in 1..7) {
                 val center = ballCenters[number - 1]
                 val dx = x - center.first
@@ -709,23 +914,13 @@ class MainActivity : ComponentActivity(), LocationListener {
                 }
             }
 
-            // GPS arba žemėlapio pasirinkimas
-            if (y in 755f..855f) {
-                if (x < 590f) {
-                    requestGpsPermission()
-                } else {
-                    handleMapChoice()
-                }
-                return true
-            }
-
-            // Apatinis GPS mygtukas
-            if (y in 1100f..1250f) {
+            // GPS mygtukas.
+            if (x in 176f..1008f && y in 755f..855f) {
                 requestGpsPermission()
                 return true
             }
 
-            // Nustatymai
+            // Nustatymai.
             if (x > 940f && y < 140f) {
                 showSettings()
                 return true
@@ -735,4 +930,3 @@ class MainActivity : ComponentActivity(), LocationListener {
         }
     }
 }
-
