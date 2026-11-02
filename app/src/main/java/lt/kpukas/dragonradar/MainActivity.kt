@@ -662,7 +662,7 @@ class MainActivity : ComponentActivity(), LocationListener {
         private var entryGlow = 0f
         // Keturi mastelio lygiai: kiekvienas paspaudimas priartina aplink žaidėją.
         // GPS koordinatės nekinta – keičiasi tik radaro atvaizdavimo mastelis.
-        private val zoomRanges = floatArrayOf(200f, 100f, 50f, 25f)
+        private val zoomRanges = floatArrayOf(200f, 50f, 10f, 2f)
         private var zoomLevel = 0
         private val radarRangeMeters: Float
             get() = zoomRanges[zoomLevel]
