@@ -1,3 +1,4 @@
+
 package lt.kpukas.dragonradar
 
 import android.Manifest
@@ -17,7 +18,6 @@ import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.math.cos
-import kotlin.math.min
 import kotlin.math.sin
 
 class MainActivity : ComponentActivity(), LocationListener {
@@ -119,15 +119,12 @@ class MainActivity : ComponentActivity(), LocationListener {
             gpsRequested = true
             creatorView.invalidate()
 
-            if (currentLocation != null) {
-                saveSelectedBallLocation()
-            } else {
-                Toast.makeText(
-                    this,
-                    "Ieškoma GPS vietos. Palauk signalo lauke.",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
+            Toast.makeText(
+                this,
+                "Ieškoma GPS vietos...",
+                Toast.LENGTH_SHORT
+            ).show()
+
         } catch (e: Exception) {
             Toast.makeText(
                 this,
@@ -158,6 +155,7 @@ class MainActivity : ComponentActivity(), LocationListener {
         val location = currentLocation ?: return
 
         val raw = preferences.getString("balls", "[]") ?: "[]"
+
         val oldArray = try {
             JSONArray(raw)
         } catch (_: Exception) {
@@ -169,7 +167,10 @@ class MainActivity : ComponentActivity(), LocationListener {
         for (i in 0 until oldArray.length()) {
             val item = oldArray.optJSONObject(i) ?: continue
             val number = item.optInt("number", -1)
-            if (number in 1..7) saved[number] = item
+
+            if (number in 1..7) {
+                saved[number] = item
+            }
         }
 
         saved[selectedBall] = JSONObject()
@@ -178,8 +179,11 @@ class MainActivity : ComponentActivity(), LocationListener {
             .put("longitude", location.longitude)
 
         val newArray = JSONArray()
+
         for (number in 1..7) {
-            saved[number]?.let { newArray.put(it) }
+            saved[number]?.let {
+                newArray.put(it)
+            }
         }
 
         preferences.edit()
@@ -217,6 +221,7 @@ class MainActivity : ComponentActivity(), LocationListener {
     }
 
     override fun onProviderEnabled(provider: String) {}
+
     override fun onProviderDisabled(provider: String) {
         Toast.makeText(
             this,
@@ -234,8 +239,20 @@ class MainActivity : ComponentActivity(), LocationListener {
 
     override fun onPause() {
         super.onPause()
+
         if (::locationManager.isInitialized && hasLocationPermission()) {
             locationManager.removeUpdates(this)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        if (::locationManager.isInitialized &&
+            hasLocationPermission() &&
+            gpsRequested
+        ) {
+            startGps()
         }
     }
 
@@ -250,6 +267,7 @@ class MainActivity : ComponentActivity(), LocationListener {
             null
         }
 
+        // Rutulių centrai bendroje 1184 x 1280 koordinačių sistemoje.
         private val ballCenters = arrayOf(
             Pair(252f, 335f),
             Pair(480f, 335f),
@@ -297,25 +315,24 @@ class MainActivity : ComponentActivity(), LocationListener {
 
             val save = canvas.save()
 
-            if (backgroundBitmap != null) {
-                scaleX = width.toFloat() / backgroundBitmap.width
-                scaleY = height.toFloat() / backgroundBitmap.height
+            // Ekranas ir fonas naudoja vienodą koordinačių sistemą.
+            scaleX = width / 1184f
+            scaleY = height / 1280f
 
-                canvas.scale(scaleX, scaleY)
+            canvas.scale(scaleX, scaleY)
+
+            if (backgroundBitmap != null) {
                 canvas.drawBitmap(
                     backgroundBitmap,
-                    0f,
-                    0f,
+                    null,
+                    RectF(0f, 0f, 1184f, 1280f),
                     Paint(Paint.ANTI_ALIAS_FLAG)
                 )
             } else {
-                scaleX = width / 1184f
-                scaleY = height / 1280f
-                canvas.scale(scaleX, scaleY)
                 canvas.drawColor(Color.rgb(12, 48, 105))
             }
 
-            // Perpiešiami visi rutuliai, kad žvaigždučių skaičius būtų tikslus.
+            // Nupiešiami visi septyni skirtingi rutuliai.
             for (number in 1..7) {
                 drawDragonBall(canvas, number)
             }
@@ -328,7 +345,6 @@ class MainActivity : ComponentActivity(), LocationListener {
             val x = center.first
             val y = center.second
 
-            // Rutulio pagrindas uždengia seną paveikslėlio rutulį.
             ballPaint.shader = RadialGradient(
                 x - 25f,
                 y - 30f,
@@ -347,7 +363,6 @@ class MainActivity : ComponentActivity(), LocationListener {
 
             canvas.drawCircle(x, y, ballRadius, edgePaint)
 
-            // Šviesos atspindys.
             canvas.drawOval(
                 x - 62f,
                 y - 66f,
@@ -356,21 +371,29 @@ class MainActivity : ComponentActivity(), LocationListener {
                 shinePaint
             )
 
-            // Žvaigždutės išdėstomos pagal jų skaičių.
             val positions = when (number) {
-                1 -> listOf(Pair(0f, 0f))
-                2 -> listOf(Pair(-22f, 0f), Pair(22f, 0f))
+                1 -> listOf(
+                    Pair(0f, 0f)
+                )
+
+                2 -> listOf(
+                    Pair(-22f, 0f),
+                    Pair(22f, 0f)
+                )
+
                 3 -> listOf(
                     Pair(0f, -24f),
                     Pair(-22f, 18f),
                     Pair(22f, 18f)
                 )
+
                 4 -> listOf(
                     Pair(-22f, -22f),
                     Pair(22f, -22f),
                     Pair(-22f, 22f),
                     Pair(22f, 22f)
                 )
+
                 5 -> listOf(
                     Pair(0f, -30f),
                     Pair(-29f, -8f),
@@ -378,6 +401,7 @@ class MainActivity : ComponentActivity(), LocationListener {
                     Pair(-18f, 27f),
                     Pair(18f, 27f)
                 )
+
                 6 -> listOf(
                     Pair(-25f, -25f),
                     Pair(25f, -25f),
@@ -386,6 +410,7 @@ class MainActivity : ComponentActivity(), LocationListener {
                     Pair(-25f, 25f),
                     Pair(25f, 25f)
                 )
+
                 else -> listOf(
                     Pair(0f, -34f),
                     Pair(-29f, -17f),
@@ -426,15 +451,22 @@ class MainActivity : ComponentActivity(), LocationListener {
             val innerRadius = radius * 0.43f
 
             for (i in 0 until 10) {
-                val angle = Math.toRadians(
-                    (-90.0 + i * 36.0)
-                )
-                val r = if (i % 2 == 0) radius else innerRadius
+                val angle = Math.toRadians(-90.0 + i * 36.0)
+
+                val r = if (i % 2 == 0) {
+                    radius
+                } else {
+                    innerRadius
+                }
+
                 val px = centerX + cos(angle).toFloat() * r
                 val py = centerY + sin(angle).toFloat() * r
 
-                if (i == 0) path.moveTo(px, py)
-                else path.lineTo(px, py)
+                if (i == 0) {
+                    path.moveTo(px, py)
+                } else {
+                    path.lineTo(px, py)
+                }
             }
 
             path.close()
@@ -442,7 +474,9 @@ class MainActivity : ComponentActivity(), LocationListener {
         }
 
         override fun onTouchEvent(event: MotionEvent): Boolean {
-            if (event.action != MotionEvent.ACTION_UP) return true
+            if (event.action != MotionEvent.ACTION_UP) {
+                return true
+            }
 
             val x = event.x / scaleX
             val y = event.y / scaleY
@@ -453,23 +487,27 @@ class MainActivity : ComponentActivity(), LocationListener {
                 val dx = x - center.first
                 val dy = y - center.second
 
-                if (dx * dx + dy * dy <= ballRadius * ballRadius * 1.5f) {
+                if (
+                    dx * dx + dy * dy <=
+                    ballRadius * ballRadius * 1.5f
+                ) {
                     selectBall(number)
                     return true
                 }
             }
 
-            // GPS / žemėlapio pasirinkimas.
+            // GPS ir žemėlapio pasirinkimai.
             if (y in 755f..855f) {
                 if (x < 590f) {
                     requestGpsPermission()
                 } else {
                     handleMapChoice()
                 }
+
                 return true
             }
 
-            // Apatinis mygtukas „Pažymėti pagal GPS“.
+            // Apatinis GPS mygtukas.
             if (y in 1100f..1250f) {
                 requestGpsPermission()
                 return true
