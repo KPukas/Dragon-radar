@@ -15,10 +15,6 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.view.Gravity
-import android.view.Sensor
-import android.view.SensorEvent
-import android.view.SensorEventListener
-import android.view.SensorManager
 import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
