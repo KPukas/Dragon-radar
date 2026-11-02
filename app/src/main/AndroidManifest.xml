@@ -2,7 +2,7 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.INTERNET" />
-    <application android:theme="@android:style/Theme.Material.NoActionBar" android:label="Dragon Radar" android:usesCleartextTraffic="false">
+    <application android:theme="@android:style/Theme.Material.NoActionBar" android:label="Dragon Radar" android:icon="@drawable/dragon_radar_icon" android:roundIcon="@drawable/dragon_radar_icon" android:usesCleartextTraffic="false">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
