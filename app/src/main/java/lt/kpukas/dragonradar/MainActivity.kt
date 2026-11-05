@@ -1461,14 +1461,17 @@ class MainActivity : ComponentActivity(), LocationListener {
             null
         }
 
+        // Išdėstymas pagal radaro maketą:
+        // 1 viršuje, 4 ir 2 viršutiniuose šonuose, 3 centre,
+        // 5 ir 6 apatiniuose šonuose, 7 apačioje.
         private val ballCenters = arrayOf(
-            Pair(259f, 390f),
-            Pair(764f, 390f),
-            Pair(259f, 700f),
-            Pair(512f, 535f),
-            Pair(764f, 700f),
-            Pair(355f, 870f),
-            Pair(670f, 870f)
+            Pair(512f, 245f),
+            Pair(734f, 405f),
+            Pair(512f, 565f),
+            Pair(290f, 405f),
+            Pair(290f, 725f),
+            Pair(734f, 725f),
+            Pair(512f, 885f)
         )
 
         private val ballRadius = 86f
