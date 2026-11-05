@@ -1467,8 +1467,8 @@ class MainActivity : ComponentActivity(), LocationListener {
         private val ballCenters = arrayOf(
             Pair(512f, 245f),
             Pair(734f, 405f),
-            Pair(512f, 565f),
             Pair(290f, 405f),
+            Pair(512f, 565f),
             Pair(290f, 725f),
             Pair(734f, 725f),
             Pair(512f, 885f)
