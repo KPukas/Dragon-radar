@@ -856,7 +856,7 @@ class MainActivity : ComponentActivity(), LocationListener {
             val fittedW = minOf(maxW, (maxH * ratio).toInt())
             val fittedH = (fittedW / ratio).toInt()
             video.layoutParams = FrameLayout.LayoutParams(fittedW, fittedH, Gravity.CENTER)
-            handler.postDelayed(showButton, 6000L)
+            handler.postDelayed(showButton, 6200L)
         }
         video.setOnCompletionListener {
             handler.removeCallbacks(showButton)
