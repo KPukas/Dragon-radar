@@ -699,7 +699,7 @@ class MainActivity : ComponentActivity(), LocationListener {
                     val savedMarker = Marker(map).apply {
                         position = point
                         icon = createBallMarkerIcon(savedNumber)
-                        title = "$savedNumber žvaigždučių rutulys"
+                        this.title = "$savedNumber žvaigždučių rutulys"
                         snippet = "Vieta išsaugota"
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                     }
