@@ -947,6 +947,7 @@ class MainActivity : ComponentActivity(), LocationListener {
         )
         var canContinue = false
         val handler = Handler(Looper.getMainLooper())
+        lateinit var pauseAtPlaybackPosition: Runnable
         val showButton = Runnable {
             if (canContinue) return@Runnable
             handler.removeCallbacks(pauseAtPlaybackPosition)
@@ -956,7 +957,7 @@ class MainActivity : ComponentActivity(), LocationListener {
             restartButton.animate().alpha(1f).setDuration(650).start()
         }
         // Pauzę nustatome pagal tikrą vaizdo įrašo atkūrimo poziciją, ne pagal laikmatį.
-        val pauseAtPlaybackPosition = object : Runnable {
+        pauseAtPlaybackPosition = object : Runnable {
             override fun run() {
                 if (canContinue || !video.isPlaying) return
                 if (video.currentPosition >= 6400) {
