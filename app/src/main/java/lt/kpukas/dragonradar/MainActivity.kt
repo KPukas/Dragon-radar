@@ -1469,7 +1469,7 @@ class MainActivity : ComponentActivity(), LocationListener {
             Pair(512f, 642f), // 1 – šiek tiek aukščiau
             Pair(660f, 705f), // 2 – viršuje dešinėje
             Pair(366f, 705f), // 3 – viršuje kairėje
-            Pair(512f, 809f), // 4 – šiek tiek žemiau, radaro centre
+            Pair(512f, 804f), // 4 – pakeltas per baltos pasirinkimo linijos storį
             Pair(335f, 861f), // 5 – apačioje kairėje
             Pair(692f, 861f), // 6 – apačioje dešinėje
             Pair(512f, 976f)  // 7 – apačioje per vidurį
