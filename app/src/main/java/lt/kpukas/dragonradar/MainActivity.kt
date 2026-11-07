@@ -681,6 +681,11 @@ class MainActivity : ComponentActivity(), LocationListener {
             )
 
             setOnClickListener {
+                // Kai visi septyni rutuliai jau pažymėti, tas pats mygtukas uždaro žemėlapį.
+                if ((1..7).all { it in savedLocations || it in foundNumbers }) {
+                    dialog.dismiss()
+                    return@setOnClickListener
+                }
                 val point = ballMarker?.position
 
                 if (point == null) {
@@ -736,8 +741,10 @@ class MainActivity : ComponentActivity(), LocationListener {
                         refreshBallPicker()
                         info.text = "$savedNumber žvaigždučių rutulio vieta išsaugota. Dabar pažymėk kitą rutulį."
                     } else {
-                        confirmButton.isEnabled = false
-                        info.text = "Visų 7 rutulių vietos pažymėtos! ✨"
+                        confirmButton.isEnabled = true
+                        confirmButton.text = "↩  GRĮŽTI"
+                        title.text = "VISI 7 RUTULIAI PAŽYMĖTI"
+                        info.text = "Visų 7 rutulių vietos pažymėtos! Gali grįžti į radarą. ✨"
                         refreshBallPicker()
                         Toast.makeText(this@MainActivity, "Visų 7 rutulių vietos išsaugotos!", Toast.LENGTH_LONG).show()
                     }
@@ -941,10 +948,23 @@ class MainActivity : ComponentActivity(), LocationListener {
         var canContinue = false
         val handler = Handler(Looper.getMainLooper())
         val showButton = Runnable {
+            if (canContinue) return@Runnable
+            handler.removeCallbacks(pauseAtPlaybackPosition)
             video.pause()
             canContinue = true
             restartButton.visibility = View.VISIBLE
             restartButton.animate().alpha(1f).setDuration(650).start()
+        }
+        // Pauzę nustatome pagal tikrą vaizdo įrašo atkūrimo poziciją, ne pagal laikmatį.
+        val pauseAtPlaybackPosition = object : Runnable {
+            override fun run() {
+                if (canContinue || !video.isPlaying) return
+                if (video.currentPosition >= 6400) {
+                    showButton.run()
+                } else {
+                    handler.postDelayed(this, 20L)
+                }
+            }
         }
         restartButton.setOnClickListener {
             if (!canContinue) return@setOnClickListener
@@ -966,10 +986,11 @@ class MainActivity : ComponentActivity(), LocationListener {
             val fittedW = minOf(maxW, (maxH * ratio).toInt())
             val fittedH = (fittedW / ratio).toInt()
             video.layoutParams = FrameLayout.LayoutParams(fittedW, fittedH, Gravity.CENTER)
-            handler.postDelayed(showButton, 6200L)
+            handler.post(pauseAtPlaybackPosition)
         }
         video.setOnCompletionListener {
             handler.removeCallbacks(showButton)
+            handler.removeCallbacks(pauseAtPlaybackPosition)
             restartButton.isEnabled = false
             fadeOverlay.visibility = View.VISIBLE
             fadeOverlay.bringToFront()
