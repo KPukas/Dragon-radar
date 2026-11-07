@@ -34,6 +34,7 @@ import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.VideoView
 import android.widget.LinearLayout
+import android.widget.HorizontalScrollView
 import android.widget.TextView
 import android.widget.Toast
 import android.text.InputType
@@ -420,7 +421,7 @@ class MainActivity : ComponentActivity(), LocationListener {
         map.setMultiTouchControls(true)
         map.controller.setZoom(16.0)
 
-        val savedLocations = loadSavedBallLocations()
+        val savedLocations = loadSavedBallLocations().toMutableMap()
         selectedBallAlreadySaved = savedLocations.containsKey(selectedBall)
 
         val gpsPoint = currentLocation?.let {
@@ -453,7 +454,7 @@ class MainActivity : ComponentActivity(), LocationListener {
         }
 
         // Dabartinio pasirinkto rutulio žymeklis.
-        val marker = if (selectedBall !in foundNumbers) Marker(map).apply {
+        var marker = if (selectedBall !in foundNumbers && selectedBall !in savedLocations) Marker(map).apply {
             position = startPoint
             icon = createBallMarkerIcon(selectedBall, 60)
 
@@ -482,7 +483,7 @@ class MainActivity : ComponentActivity(), LocationListener {
         } else null
 
         ballMarker = marker
-        if (marker != null) map.overlays.add(marker) else info.text = "Šis rutulys jau surinktas, todėl žemėlapyje jo nebėra."
+        if (marker != null) map.overlays.add(marker) else info.text = "Šis rutulys jau pažymėtas arba surinktas."
 
         // Mėlynas GPS taškas su trumpu išsiplėtimo impulsu.
         var gpsPulse = 0f
@@ -564,7 +565,73 @@ class MainActivity : ComponentActivity(), LocationListener {
             1f
         )
 
+        // Viršuje rodomi tik dar nepažymėti rutuliai; pasirinkimą galima keisti negrįžtant į meniu.
+        val ballPicker = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        val ballPickerScroll = HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(ballPicker)
+        }
+        fun refreshBallPicker() {
+            ballPicker.removeAllViews()
+            for (number in 1..7) {
+                if (number in savedLocations || number in foundNumbers) continue
+                val choice = Button(this).apply {
+                    text = "$number ★"
+                    isAllCaps = false
+                    textSize = 14f
+                    setTextColor(Color.WHITE)
+                    backgroundTintList = ColorStateList.valueOf(
+                        if (number == selectedBall) Color.rgb(225, 112, 0)
+                        else Color.rgb(65, 85, 105)
+                    )
+                    setOnClickListener {
+                        if (marker == null) return@setOnClickListener
+                        selectedBall = number
+                        selectedBallAlreadySaved = false
+                        title.text = "PAŽYMĖK $selectedBall ŽVAIGŽDUČIŲ RUTULĮ"
+                        marker?.let { map.overlays.remove(it) }
+                        val newMarker = Marker(map).apply {
+                            position = savedLocations[number] ?: gpsPoint
+                            icon = createBallMarkerIcon(number, 60)
+                            this.title = "$number žvaigždučių rutulys"
+                            snippet = "Laikyk nuspaudęs ir perkelk žymeklį"
+                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                            setDraggable(true)
+                            setOnMarkerDragListener(object : Marker.OnMarkerDragListener {
+                                override fun onMarkerDrag(marker: Marker) {}
+                                override fun onMarkerDragEnd(marker: Marker) {
+                                    info.text = "Rutulio žymeklis perkeltas. Patikrink vietą ir patvirtink."
+                                }
+                                override fun onMarkerDragStart(marker: Marker) {}
+                            })
+                        }
+                        marker = newMarker
+                        ballMarker = newMarker
+                        map.overlays.add(newMarker)
+                        map.controller.animateTo(newMarker.position)
+                        refreshBallPicker()
+                        map.invalidate()
+                    }
+                }
+                ballPicker.addView(choice, LinearLayout.LayoutParams(
+                    (58 * resources.displayMetrics.density).toInt(),
+                    (48 * resources.displayMetrics.density).toInt()
+                ).apply {
+                    marginStart = 3
+                    marginEnd = 3
+                })
+            }
+        }
+        refreshBallPicker()
+
         layout.addView(title)
+        layout.addView(ballPickerScroll, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            (52 * resources.displayMetrics.density).toInt()
+        ))
         layout.addView(info)
         layout.addView(map, mapParams)
 
@@ -619,19 +686,58 @@ class MainActivity : ComponentActivity(), LocationListener {
                         Toast.LENGTH_SHORT
                     ).show()
                 } else {
-                    saveSelectedBallLocation(
-                        point.latitude,
-                        point.longitude
-                    )
+                    val savedNumber = selectedBall
+                    saveSelectedBallLocation(point.latitude, point.longitude)
+                    savedLocations[savedNumber] = GeoPoint(point.latitude, point.longitude)
 
-                    stopLocationUpdates()
-                    dialog.dismiss()
+                    // Išsaugotą vietą paliekame žemėlapyje kaip nejudinamą žymeklį.
+                    marker?.let { map.overlays.remove(it) }
+                    val savedMarker = Marker(map).apply {
+                        position = point
+                        icon = createBallMarkerIcon(savedNumber)
+                        title = "$savedNumber žvaigždučių rutulys"
+                        snippet = "Vieta išsaugota"
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                    }
+                    map.overlays.add(savedMarker)
+                    marker = null
+                    ballMarker = null
 
-                    Toast.makeText(
-                        this@MainActivity,
-                        "$selectedBall žvaigždučių rutulio vieta išsaugota!",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    val nextNumber = (1..7).firstOrNull {
+                        it !in savedLocations && it !in foundNumbers
+                    }
+                    if (nextNumber != null) {
+                        selectedBall = nextNumber
+                        title.text = "PAŽYMĖK $selectedBall ŽVAIGŽDUČIŲ RUTULĮ"
+                        val nextMarker = Marker(map).apply {
+                            position = gpsPoint
+                            icon = createBallMarkerIcon(nextNumber, 60)
+                            this.title = "$nextNumber žvaigždučių rutulys"
+                            snippet = "Laikyk nuspaudęs ir perkelk žymeklį"
+                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                            setDraggable(true)
+                            setOnMarkerDragListener(object : Marker.OnMarkerDragListener {
+                                override fun onMarkerDrag(marker: Marker) {}
+                                override fun onMarkerDragEnd(marker: Marker) {
+                                    info.text = "Rutulio žymeklis perkeltas. Patikrink vietą ir patvirtink."
+                                }
+                                override fun onMarkerDragStart(marker: Marker) {}
+                            })
+                        }
+                        marker = nextMarker
+                        ballMarker = nextMarker
+                        map.overlays.add(nextMarker)
+                        map.controller.animateTo(gpsPoint)
+                        confirmButton.isEnabled = true
+                        refreshBallPicker()
+                        info.text = "$savedNumber žvaigždučių rutulio vieta išsaugota. Dabar pažymėk kitą rutulį."
+                    } else {
+                        confirmButton.isEnabled = false
+                        info.text = "Visų 7 rutulių vietos pažymėtos! ✨"
+                        refreshBallPicker()
+                        Toast.makeText(this@MainActivity, "Visų 7 rutulių vietos išsaugotos!", Toast.LENGTH_LONG).show()
+                    }
+                    map.invalidate()
                 }
             }
         }
