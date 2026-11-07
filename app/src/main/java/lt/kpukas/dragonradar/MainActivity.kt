@@ -960,7 +960,7 @@ class MainActivity : ComponentActivity(), LocationListener {
         pauseAtPlaybackPosition = object : Runnable {
             override fun run() {
                 if (canContinue || !video.isPlaying) return
-                if (video.currentPosition >= 6400) {
+                if (video.currentPosition >= 6300) {
                     showButton.run()
                 } else {
                     handler.postDelayed(this, 20L)
