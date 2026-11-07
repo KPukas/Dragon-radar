@@ -1466,10 +1466,10 @@ class MainActivity : ComponentActivity(), LocationListener {
         // 5/6 apatiniuose šonuose, 7 apačioje.
         // Koordinatės atitinka 1024 × 1792 fono paveikslėlio erdvę.
         private val ballCenters = arrayOf(
-            Pair(512f, 663f), // 1 – viršuje per vidurį
+            Pair(512f, 642f), // 1 – šiek tiek aukščiau
             Pair(660f, 705f), // 2 – viršuje dešinėje
             Pair(366f, 705f), // 3 – viršuje kairėje
-            Pair(512f, 788f), // 4 – radaro centras
+            Pair(512f, 809f), // 4 – šiek tiek žemiau, radaro centre
             Pair(335f, 861f), // 5 – apačioje kairėje
             Pair(692f, 861f), // 6 – apačioje dešinėje
             Pair(512f, 976f)  // 7 – apačioje per vidurį
@@ -2003,14 +2003,6 @@ class MainActivity : ComponentActivity(), LocationListener {
                 y,
                 ballRadius,
                 edgePaint
-            )
-
-            canvas.drawOval(
-                x - 62f,
-                y - 66f,
-                x - 27f,
-                y - 30f,
-                shinePaint
             )
 
             val positions = when (number) {
