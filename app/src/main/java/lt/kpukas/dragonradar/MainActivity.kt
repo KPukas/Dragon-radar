@@ -434,6 +434,10 @@ class MainActivity : ComponentActivity(), LocationListener {
 
         // Rodome visus kitus jau pažymėtus rutulius žemėlapyje.
         val foundNumbers = loadFoundBallNumbers()
+        if (selectedBall in savedLocations || selectedBall in foundNumbers) {
+            selectedBall = (1..7).firstOrNull { it !in savedLocations && it !in foundNumbers } ?: selectedBall
+            title.text = "PAŽYMĖK $selectedBall ŽVAIGŽDUČIŲ RUTULĮ"
+        }
         for ((number, point) in savedLocations) {
             if (number == selectedBall || number in foundNumbers) continue
 
@@ -455,7 +459,7 @@ class MainActivity : ComponentActivity(), LocationListener {
 
         // Dabartinio pasirinkto rutulio žymeklis.
         var marker = if (selectedBall !in foundNumbers && selectedBall !in savedLocations) Marker(map).apply {
-            position = startPoint
+            position = savedLocations[selectedBall] ?: gpsPoint
             icon = createBallMarkerIcon(selectedBall, 60)
 
             this.title = "$selectedBall žvaigždučių rutulys"
@@ -588,7 +592,6 @@ class MainActivity : ComponentActivity(), LocationListener {
                         else Color.rgb(65, 85, 105)
                     )
                     setOnClickListener {
-                        if (marker == null) return@setOnClickListener
                         selectedBall = number
                         selectedBallAlreadySaved = false
                         title.text = "PAŽYMĖK $selectedBall ŽVAIGŽDUČIŲ RUTULĮ"
@@ -664,7 +667,8 @@ class MainActivity : ComponentActivity(), LocationListener {
             }
         }
 
-        val confirmButton = Button(this).apply {
+        lateinit var confirmButton: Button
+        confirmButton = Button(this).apply {
             isEnabled = selectedBall !in foundNumbers
             text = "✓  PATVIRTINTI RUTULIO VIETĄ"
             textSize = 13f
